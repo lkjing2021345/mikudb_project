@@ -4,7 +4,7 @@
 </div>
 <div align="center">
     <h1>MikuDB</h1>
-    <h2>基于 OpenRuler 操作系统开发的数据库应用</h2>
+    <h2>基于 OpenRuler 操作系统的非关系型数据库应用</h2>
 </div>
 <br>
 <div align="center">
