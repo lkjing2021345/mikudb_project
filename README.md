@@ -105,8 +105,8 @@ mikudb/
 | mikudb-storage | ✅ 完成 | 基于 RocksDB 的存储引擎 |
 | mikudb-query | ✅ 完成 | MQL 词法分析、解析器、执行器 |
 | mikudb-core | ✅ 完成 | 核心引擎整合层 |
-| mikudb-server | 🚧 待开发 | 数据库服务器 |
-| mikudb-cli | 🚧 待开发 | 命令行客户端 |
+| mikudb-server | ✅ 完成 | 数据库服务器 (MikuWire 协议、认证、会话管理) |
+| mikudb-cli | ✅ 完成 | 命令行客户端 (REPL、语法高亮、自动补全) |
 
 #### 已实现功能
 
@@ -150,6 +150,54 @@ mikudb/
 - [x] 错误类型定义
 - [x] 平台检测 (OpenEuler/Linux/Windows/macOS)
 - [x] 配置管理
+
+**mikudb-server (数据库服务器)**
+- [x] MikuWire 二进制协议
+  - [x] MAGIC 魔数校验 ("MIKU")
+  - [x] 消息头 (版本、操作码、请求ID、标志位、长度)
+  - [x] 20+ 操作码 (CRUD、索引、事务等)
+- [x] 网络层
+  - [x] TCP 监听器 (异步 Tokio)
+  - [x] Unix Socket 支持 (Linux)
+  - [x] 连接限流 (Semaphore)
+- [x] 认证模块
+  - [x] 用户名/密码验证
+  - [x] 会话管理 (创建、超时、清理)
+- [x] 请求处理器
+  - [x] Query/Insert/Update/Delete/Find
+  - [x] CreateCollection/DropCollection/ListCollections
+  - [x] CreateDatabase/DropDatabase/ListDatabases
+  - [x] Ping/Pong 心跳
+- [x] OpenEuler 优化 (条件编译)
+  - [x] 大页内存 (Huge Pages)
+  - [x] NUMA 感知内存分配
+  - [x] io_uring 异步 I/O
+  - [x] CPU 亲和性绑定
+  - [x] TCP 内核参数调优
+
+**mikudb-cli (命令行客户端)**
+- [x] 异步 TCP 客户端
+  - [x] MikuWire 协议实现
+  - [x] 自动重连机制
+  - [x] 超时处理
+- [x] REPL 交互环境 (Rustyline)
+  - [x] 多行输入支持
+  - [x] 历史记录持久化 (~/.mikudb_history)
+  - [x] Emacs 快捷键
+- [x] 语法高亮 (MqlHighlighter)
+  - [x] 关键字着色 (青色)
+  - [x] 字符串着色 (绿色)
+  - [x] 数字着色 (黄色)
+  - [x] 操作符着色 (品红)
+- [x] 自动补全 (MqlCompleter)
+  - [x] MQL 关键字补全
+  - [x] 上下文感知补全
+- [x] 输出格式化
+  - [x] JSON 美化输出
+  - [x] 表格输出 (tabled)
+- [x] 内置命令
+  - [x] .help / .exit / .quit
+  - [x] .status / .clear
 
 #### 编译状态
 
@@ -232,27 +280,33 @@ mikudb/
 ### 第二阶段：服务器与协议（v0.2.0）
 
 #### 4. 数据库服务器
-- [ ] 网络层
-  - [ ] TCP 监听器 (端口 3939)
-  - [ ] Unix Domain Socket 支持
+- [x] 网络层
+  - [x] TCP 监听器 (端口 3939)
+  - [x] Unix Domain Socket 支持 (Linux)
   - [ ] TLS/SSL 加密
-  - [ ] 连接池管理
-  - [ ] 请求限流
-- [ ] 通信协议
-  - [ ] 自定义二进制协议 (MikuWire)
-  - [ ] 消息帧格式定义
-  - [ ] 请求/响应模型
-  - [ ] 心跳机制
-- [ ] 认证授权
-  - [ ] 用户管理 (CRUD)
+  - [x] 连接池管理 (Semaphore 限流)
+  - [x] 请求限流
+- [x] 通信协议
+  - [x] 自定义二进制协议 (MikuWire)
+  - [x] 消息帧格式定义 (MAGIC + Header + Payload)
+  - [x] 请求/响应模型
+  - [x] 心跳机制 (Ping/Pong)
+- [x] 认证授权
+  - [x] 用户认证 (用户名/密码)
   - [ ] 角色管理
   - [ ] SCRAM-SHA-256 认证
   - [ ] 基于角色的访问控制 (RBAC)
   - [ ] 数据库/集合级权限
-- [ ] 会话管理
-  - [ ] 会话创建/销毁
-  - [ ] 会话超时
-  - [ ] 游标管理
+- [x] 会话管理
+  - [x] 会话创建/销毁
+  - [x] 会话超时
+  - [x] 游标管理
+- [x] OpenEuler 优化 (Linux)
+  - [x] 大页内存支持
+  - [x] NUMA 感知
+  - [x] io_uring 异步 I/O
+  - [x] CPU 亲和性
+  - [x] TCP 调优
 
 #### 5. MQL 查询语言设计
 ```
@@ -330,34 +384,34 @@ REVOKE role ON database.collection FROM username
 ### 第三阶段：CLI 客户端（v0.3.0）
 
 #### 6. MikuDB-CLI
-- [ ] REPL 交互环境
-  - [ ] 多行输入支持
-  - [ ] 历史记录 (持久化)
-  - [ ] 快捷键绑定 (Emacs/Vi 模式)
-- [ ] 语法高亮
-  - [ ] 关键字高亮
-  - [ ] 字符串/数字高亮
-  - [ ] 错误标红
-- [ ] 自动补全
-  - [ ] 关键字补全
-  - [ ] 数据库/集合名补全
+- [x] REPL 交互环境
+  - [x] 多行输入支持
+  - [x] 历史记录 (持久化)
+  - [x] 快捷键绑定 (Emacs 模式)
+- [x] 语法高亮
+  - [x] 关键字高亮
+  - [x] 字符串/数字高亮
+  - [x] 错误标红
+- [x] 自动补全
+  - [x] 关键字补全
+  - [x] 数据库/集合名补全
   - [ ] 字段名补全 (基于 schema 推断)
-  - [ ] 智能上下文补全
+  - [x] 智能上下文补全
 - [ ] 语法校验
   - [ ] 实时语法检查
   - [ ] 错误提示与纠正建议
   - [ ] Did you mean "xxx"? 提示
-- [ ] 输出格式化
-  - [ ] JSON 美化输出
-  - [ ] 表格输出
+- [x] 输出格式化
+  - [x] JSON 美化输出
+  - [x] 表格输出
   - [ ] CSV 导出
-- [ ] 脚本模式
-  - [ ] 文件执行 `mikudb-cli < script.mql`
-  - [ ] 管道支持
-- [ ] 连接管理
-  - [ ] 连接字符串解析
+- [x] 脚本模式
+  - [x] 文件执行 `mikudb-cli < script.mql`
+  - [x] 管道支持
+- [x] 连接管理
+  - [x] 连接字符串解析
   - [ ] 多服务器切换
-  - [ ] 连接配置文件
+  - [x] 连接配置文件
 
 ---
 

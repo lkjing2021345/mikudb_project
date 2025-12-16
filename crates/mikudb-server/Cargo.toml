@@ -1,0 +1,57 @@
+[package]
+name = "mikudb-server"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "MikuDB Server - High-performance document database server optimized for OpenEuler"
+
+[[bin]]
+name = "mikudb-server"
+path = "src/main.rs"
+
+[dependencies]
+mikudb-core = { path = "../mikudb-core" }
+mikudb-common = { path = "../mikudb-common" }
+mikudb-boml = { path = "../mikudb-boml" }
+mikudb-storage = { path = "../mikudb-storage" }
+mikudb-query = { path = "../mikudb-query" }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+parking_lot = { workspace = true }
+dashmap = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+indexmap = "2.2"
+compact_str = "0.8"
+
+toml = "0.8"
+clap = { version = "4.4", features = ["derive", "env"] }
+signal-hook = "0.3"
+socket2 = { version = "0.5", features = ["all"] }
+sha2 = { workspace = true }
+base64 = "0.22"
+rand = "0.8"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+nix = { version = "0.27", features = ["net", "socket", "uio", "fs"] }
+libc = "0.2"
+
+[features]
+default = []
+openeuler = ["mikudb-core/openeuler", "mikudb-storage/openeuler"]
+io_uring = []
+numa = []
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = { workspace = true }

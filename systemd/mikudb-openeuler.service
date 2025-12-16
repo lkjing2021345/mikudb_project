@@ -1,0 +1,52 @@
+[Unit]
+Description=MikuDB Server (OpenEuler Optimized)
+Documentation=https://github.com/mikudb/mikudb
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=notify
+User=mikudb
+Group=mikudb
+ExecStartPre=/usr/local/bin/mikudb-tune-kernel.sh
+ExecStart=/usr/local/bin/mikudb-server --config /etc/mikudb/mikudb.toml
+ExecReload=/bin/kill -HUP $MAINPID
+Restart=on-failure
+RestartSec=5
+TimeoutStartSec=30
+TimeoutStopSec=30
+
+WorkingDirectory=/var/lib/mikudb
+RuntimeDirectory=mikudb
+RuntimeDirectoryMode=0755
+
+LimitNOFILE=1048576
+LimitNPROC=1048576
+LimitCORE=infinity
+LimitMEMLOCK=infinity
+
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+ReadWritePaths=/var/lib/mikudb /var/log/mikudb /var/run/mikudb
+
+CapabilityBoundingSet=CAP_NET_BIND_SERVICE CAP_SYS_RESOURCE CAP_IPC_LOCK CAP_SYS_NICE
+AmbientCapabilities=CAP_NET_BIND_SERVICE CAP_IPC_LOCK
+
+CPUSchedulingPolicy=fifo
+CPUSchedulingPriority=50
+IOSchedulingClass=realtime
+IOSchedulingPriority=0
+
+Environment="MIKUDB_CONFIG=/etc/mikudb/mikudb.toml"
+Environment="RUST_LOG=info"
+Environment="MALLOC_ARENA_MAX=2"
+Environment="MALLOC_MMAP_THRESHOLD_=131072"
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=mikudb
+
+[Install]
+WantedBy=multi-user.target
