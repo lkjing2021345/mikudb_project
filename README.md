@@ -1,4 +1,5 @@
 <br>
+
 <div align="center">
     <img src="https://vip.123pan.cn/1842292950/ymjew503t0m000d7w32xzgmn6upslg2jDIYxDqi2DqryDcxwDwizAY==.svg" width=100/>
 </div>
@@ -13,3 +14,516 @@
     <img src="https://img.shields.io/badge/License-MIT-Black">
 </div>
 <br>
+
+---
+
+## 项目概述
+
+MikuDB 是一款专为 OpenEuler 操作系统设计的高性能非关系型文档数据库，采用自研的 BOML（Binary Object Markup Language）格式存储数据，目标是超越 MongoDB 的稳定性和性能表现。
+
+### 核心特性
+
+- 🚀 **高性能**：基于 Rust 语言开发，零成本抽象，内存安全
+- 📦 **BOML 格式**：自研二进制文档格式，对标 BSON，更高效的序列化/反序列化
+- 🐧 **OpenEuler 原生**：深度适配 OpenEuler 系统特性
+- 🤖 **AI 原生集成**：内置 MCP Server，支持 OpenAI 格式 API 接入
+- 💻 **智能 CLI**：MikuDB-CLI 带语法提示、Tab 补全、错误纠正
+- 🔐 **安全可靠**：完善的认证授权机制
+
+### 默认配置
+
+| 配置项 | 默认值 |
+|--------|--------|
+| 端口 | 3939 |
+| 默认用户名 | miku |
+| 默认密码 | mikumiku3939 |
+
+---
+
+## 开发方案
+
+### 一、项目架构
+
+```
+mikudb/
+├── mikudb-core/          # 核心引擎库
+│   ├── boml/             # BOML 格式解析器
+│   ├── storage/          # 存储引擎
+│   ├── index/            # 索引系统
+│   ├── query/            # 查询引擎
+│   └── transaction/      # 事务管理
+├── mikudb-server/        # 数据库服务器
+│   ├── network/          # 网络层（TCP/Unix Socket）
+│   ├── protocol/         # 通信协议
+│   ├── auth/             # 认证授权
+│   └── cluster/          # 集群管理
+├── mikudb-cli/           # 命令行客户端
+│   ├── repl/             # 交互式环境
+│   ├── completer/        # 自动补全
+│   ├── highlighter/      # 语法高亮
+│   └── validator/        # 语法校验
+├── mikudb-mcp/           # MCP Server 模块
+│   ├── server/           # MCP 服务实现
+│   ├── tools/            # MCP 工具定义
+│   └── resources/        # MCP 资源定义
+├── mikudb-ai/            # AI 集成模块
+│   ├── openai/           # OpenAI 格式适配
+│   ├── embedding/        # 向量嵌入
+│   └── nl2mql/           # 自然语言转查询
+└── mikudb-openeuler/     # OpenEuler 适配层
+    ├── systemd/          # 服务管理
+    ├── selinux/          # SELinux 策略
+    └── tuning/           # 性能调优
+```
+
+### 二、技术选型
+
+| 模块 | 技术方案 |
+|------|----------|
+| 开发语言 | Rust (MSRV 1.75+) |
+| 异步运行时 | Tokio |
+| 网络框架 | Tower + Hyper |
+| 序列化 | 自研 BOML + Serde |
+| 存储引擎 | 自研 LSM-Tree / B+Tree 混合引擎 |
+| CLI 框架 | Rustyline + Clap |
+| 配置管理 | TOML |
+| 日志系统 | Tracing |
+| 测试框架 | 内置测试 + Criterion (基准测试) |
+
+---
+
+## 功能列表
+
+### 第一阶段：核心引擎（v0.1.0）
+
+#### 1. BOML 格式解析器
+- [ ] 定义 BOML 规范文档
+- [ ] 实现基础数据类型
+  - [ ] Null、Boolean、Integer (i32/i64/i128)
+  - [ ] Float (f32/f64)、Decimal (高精度)
+  - [ ] String (UTF-8)、Binary (字节数组)
+  - [ ] DateTime、Timestamp、Date、Time
+  - [ ] ObjectId (12字节唯一标识)
+  - [ ] UUID
+  - [ ] Array、Document (嵌套文档)
+  - [ ] Regex、JavaScript (可选)
+- [ ] 实现序列化器 (Rust → BOML)
+- [ ] 实现反序列化器 (BOML → Rust)
+- [ ] Serde 集成支持
+- [ ] 与 BSON/JSON 互转工具
+- [ ] 基准测试（对比 BSON 性能）
+
+#### 2. 存储引擎
+- [ ] 页面管理器 (Page Manager)
+  - [ ] 4KB/8KB/16KB 可配置页面大小
+  - [ ] 页面缓存 (LRU/CLOCK)
+  - [ ] 脏页刷写策略
+- [ ] WAL (Write-Ahead Logging)
+  - [ ] 日志记录格式
+  - [ ] 日志刷写策略
+  - [ ] 崩溃恢复机制
+- [ ] 文档存储
+  - [ ] 变长记录存储
+  - [ ] 空闲空间管理
+  - [ ] 文档压缩 (LZ4/Zstd)
+- [ ] 索引引擎
+  - [ ] B+Tree 索引
+  - [ ] 哈希索引
+  - [ ] 复合索引
+  - [ ] 唯一索引
+  - [ ] 稀疏索引
+  - [ ] TTL 索引
+  - [ ] 全文索引 (基础)
+  - [ ] 地理空间索引 (2dsphere)
+- [ ] 事务管理
+  - [ ] MVCC (多版本并发控制)
+  - [ ] 读已提交隔离级别
+  - [ ] 可重复读隔离级别
+  - [ ] 快照隔离
+  - [ ] 分布式事务 (2PC)
+
+#### 3. 查询引擎
+- [ ] 查询解析器
+- [ ] 查询优化器
+  - [ ] 基于规则的优化 (RBO)
+  - [ ] 基于代价的优化 (CBO)
+  - [ ] 索引选择
+- [ ] 执行器
+  - [ ] 迭代器模型
+  - [ ] 向量化执行 (可选)
+- [ ] 聚合管道
+  - [ ] $match, $project, $group
+  - [ ] $sort, $limit, $skip
+  - [ ] $lookup (关联查询)
+  - [ ] $unwind, $bucket
+
+---
+
+### 第二阶段：服务器与协议（v0.2.0）
+
+#### 4. 数据库服务器
+- [ ] 网络层
+  - [ ] TCP 监听器 (端口 3939)
+  - [ ] Unix Domain Socket 支持
+  - [ ] TLS/SSL 加密
+  - [ ] 连接池管理
+  - [ ] 请求限流
+- [ ] 通信协议
+  - [ ] 自定义二进制协议 (MikuWire)
+  - [ ] 消息帧格式定义
+  - [ ] 请求/响应模型
+  - [ ] 心跳机制
+- [ ] 认证授权
+  - [ ] 用户管理 (CRUD)
+  - [ ] 角色管理
+  - [ ] SCRAM-SHA-256 认证
+  - [ ] 基于角色的访问控制 (RBAC)
+  - [ ] 数据库/集合级权限
+- [ ] 会话管理
+  - [ ] 会话创建/销毁
+  - [ ] 会话超时
+  - [ ] 游标管理
+
+#### 5. MQL 查询语言设计
+```
+// MQL (Miku Query Language) 语法设计
+
+// 数据库操作
+USE database_name
+SHOW DATABASES
+CREATE DATABASE db_name
+DROP DATABASE db_name
+
+// 集合操作
+SHOW COLLECTIONS
+CREATE COLLECTION collection_name
+DROP COLLECTION collection_name
+
+// 文档 CRUD
+INSERT INTO collection_name {field1: value1, field2: value2}
+INSERT INTO collection_name [{doc1}, {doc2}, {doc3}]
+
+FIND collection_name                           // 查询所有
+FIND collection_name WHERE field = value       // 条件查询
+FIND collection_name WHERE field > 10 AND field2 = "test"
+FIND collection_name WHERE field IN [1, 2, 3]
+FIND collection_name WHERE field LIKE "pattern%"
+FIND collection_name WHERE nested.field = value
+FIND collection_name SELECT field1, field2     // 投影
+FIND collection_name ORDER BY field ASC|DESC
+FIND collection_name LIMIT 10 SKIP 20
+
+UPDATE collection_name SET field = value WHERE condition
+UPDATE collection_name SET field += 1 WHERE condition        // 增量更新
+UPDATE collection_name UNSET field WHERE condition           // 删除字段
+UPDATE collection_name PUSH array_field = value WHERE cond   // 数组追加
+
+DELETE FROM collection_name WHERE condition
+DELETE FROM collection_name                    // 清空集合
+
+// 聚合查询
+AGGREGATE collection_name
+  | MATCH field > 10
+  | GROUP BY field1 AS {count: COUNT(), sum: SUM(field2)}
+  | SORT count DESC
+  | LIMIT 10
+
+// 索引操作
+CREATE INDEX idx_name ON collection_name (field1 ASC, field2 DESC)
+CREATE UNIQUE INDEX idx_name ON collection_name (field)
+CREATE TEXT INDEX idx_name ON collection_name (field)
+DROP INDEX idx_name ON collection_name
+SHOW INDEXES ON collection_name
+
+// 事务
+BEGIN TRANSACTION
+  INSERT INTO ...
+  UPDATE ...
+COMMIT
+
+// AI 集成语法
+AI QUERY "用自然语言描述你想要的查询"
+AI ANALYZE collection_name    // AI 分析集合结构
+AI SUGGEST INDEX collection_name  // AI 建议索引
+
+// 管理命令
+SHOW STATUS
+SHOW USERS
+CREATE USER username WITH PASSWORD 'password' ROLE role_name
+DROP USER username
+GRANT role ON database.collection TO username
+REVOKE role ON database.collection FROM username
+```
+
+---
+
+### 第三阶段：CLI 客户端（v0.3.0）
+
+#### 6. MikuDB-CLI
+- [ ] REPL 交互环境
+  - [ ] 多行输入支持
+  - [ ] 历史记录 (持久化)
+  - [ ] 快捷键绑定 (Emacs/Vi 模式)
+- [ ] 语法高亮
+  - [ ] 关键字高亮
+  - [ ] 字符串/数字高亮
+  - [ ] 错误标红
+- [ ] 自动补全
+  - [ ] 关键字补全
+  - [ ] 数据库/集合名补全
+  - [ ] 字段名补全 (基于 schema 推断)
+  - [ ] 智能上下文补全
+- [ ] 语法校验
+  - [ ] 实时语法检查
+  - [ ] 错误提示与纠正建议
+  - [ ] Did you mean "xxx"? 提示
+- [ ] 输出格式化
+  - [ ] JSON 美化输出
+  - [ ] 表格输出
+  - [ ] CSV 导出
+- [ ] 脚本模式
+  - [ ] 文件执行 `mikudb-cli < script.mql`
+  - [ ] 管道支持
+- [ ] 连接管理
+  - [ ] 连接字符串解析
+  - [ ] 多服务器切换
+  - [ ] 连接配置文件
+
+---
+
+### 第四阶段：AI 与 MCP 集成（v0.4.0）
+
+#### 7. MCP Server
+- [ ] MCP 协议实现
+  - [ ] stdio 传输
+  - [ ] SSE 传输
+- [ ] 工具定义
+  - [ ] `query` - 执行 MQL 查询
+  - [ ] `insert` - 插入文档
+  - [ ] `update` - 更新文档
+  - [ ] `delete` - 删除文档
+  - [ ] `aggregate` - 聚合查询
+  - [ ] `schema` - 获取集合结构
+  - [ ] `stats` - 获取统计信息
+- [ ] 资源定义
+  - [ ] `databases` - 数据库列表
+  - [ ] `collections` - 集合列表
+  - [ ] `documents` - 文档资源
+- [ ] Prompts 定义
+  - [ ] 查询辅助提示
+  - [ ] Schema 设计建议
+
+#### 8. AI 集成模块
+- [ ] OpenAI 格式适配器
+  - [ ] Chat Completions API
+  - [ ] Embeddings API
+  - [ ] 支持自定义 base_url
+- [ ] 多模型支持
+  - [ ] OpenAI (GPT-4, GPT-3.5)
+  - [ ] Anthropic Claude
+  - [ ] 本地模型 (Ollama)
+  - [ ] Azure OpenAI
+- [ ] 向量搜索
+  - [ ] 向量字段类型
+  - [ ] 向量索引 (HNSW)
+  - [ ] 相似度搜索 API
+- [ ] 自然语言查询
+  - [ ] NL → MQL 转换
+  - [ ] 查询意图识别
+  - [ ] 上下文对话支持
+- [ ] 智能功能
+  - [ ] 自动索引建议
+  - [ ] 查询优化建议
+  - [ ] Schema 设计助手
+  - [ ] 数据异常检测
+
+---
+
+### 第五阶段：OpenEuler 适配与生产就绪（v0.5.0）
+
+#### 9. OpenEuler 深度适配
+- [ ] 系统服务
+  - [ ] systemd 服务文件
+  - [ ] 自动启动配置
+  - [ ] 日志集成 (journald)
+- [ ] 安全加固
+  - [ ] SELinux 策略模块
+  - [ ] Seccomp 过滤器
+  - [ ] Capabilities 限制
+- [ ] 性能调优
+  - [ ] 内核参数优化脚本
+  - [ ] 大页内存支持
+  - [ ] NUMA 感知
+  - [ ] io_uring 异步 I/O
+- [ ] 包管理
+  - [ ] RPM 打包规范
+  - [ ] DNF 仓库配置
+- [ ] 监控集成
+  - [ ] Prometheus metrics 导出
+  - [ ] Grafana 仪表盘模板
+
+#### 10. 集群与高可用（v0.6.0+）
+- [ ] 副本集
+  - [ ] 主从复制
+  - [ ] 自动故障转移
+  - [ ] 读写分离
+- [ ] 分片集群
+  - [ ] 范围分片
+  - [ ] 哈希分片
+  - [ ] 分片键选择
+  - [ ] 数据均衡
+- [ ] 管理工具
+  - [ ] 集群状态监控
+  - [ ] 在线扩缩容
+  - [ ] 数据迁移工具
+
+---
+
+## 配置文件设计
+
+### 服务器配置 (mikudb.toml)
+
+```toml
+[server]
+bind = "0.0.0.0"
+port = 3939
+unix_socket = "/var/run/mikudb/mikudb.sock"
+max_connections = 10000
+timeout = 30000  # ms
+
+[storage]
+data_dir = "/var/lib/mikudb/data"
+wal_dir = "/var/lib/mikudb/wal"
+page_size = 16384  # 16KB
+cache_size = "1GB"
+compression = "lz4"  # none, lz4, zstd
+
+[auth]
+enabled = true
+default_user = "miku"
+default_password = "mikumiku3939"
+
+[security]
+tls_enabled = false
+tls_cert = "/etc/mikudb/ssl/cert.pem"
+tls_key = "/etc/mikudb/ssl/key.pem"
+
+[log]
+level = "info"  # trace, debug, info, warn, error
+file = "/var/log/mikudb/mikudb.log"
+rotation = "daily"
+max_files = 7
+
+[ai]
+enabled = false
+provider = "openai"  # openai, anthropic, ollama, azure
+
+[ai.openai]
+api_key = ""
+base_url = "https://api.openai.com/v1"
+model = "gpt-4"
+embedding_model = "text-embedding-3-small"
+
+[ai.anthropic]
+api_key = ""
+model = "claude-3-opus-20240229"
+
+[ai.ollama]
+base_url = "http://localhost:11434"
+model = "llama2"
+
+[mcp]
+enabled = true
+transport = "stdio"  # stdio, sse
+
+[replication]
+enabled = false
+role = "primary"  # primary, secondary
+replica_set = "rs0"
+
+[metrics]
+enabled = true
+prometheus_port = 9939
+```
+
+---
+
+## 开发路线图
+
+| 版本 | 里程碑 | 预计时间 |
+|------|--------|----------|
+| v0.1.0 | BOML 格式 + 存储引擎核心 | 8 周 |
+| v0.2.0 | 服务器 + MQL 查询语言 | 6 周 |
+| v0.3.0 | MikuDB-CLI 完整功能 | 4 周 |
+| v0.4.0 | MCP Server + AI 集成 | 4 周 |
+| v0.5.0 | OpenEuler 适配 + 生产就绪 | 4 周 |
+| v0.6.0 | 副本集 + 分片集群 | 8 周 |
+| v1.0.0 | 正式发布 | - |
+
+---
+
+## 性能目标
+
+| 指标 | 目标值 | 对比 MongoDB |
+|------|--------|--------------|
+| 单文档插入 QPS | > 100,000 | +30% |
+| 批量插入吞吐 | > 500,000 docs/s | +50% |
+| 简单查询延迟 (P99) | < 1ms | -40% |
+| 复杂聚合查询 | 同等复杂度 -30% | -30% |
+| 内存占用 | 基准 -20% | -20% |
+| 冷启动时间 | < 2s | -50% |
+
+---
+
+## 目录结构（计划）
+
+```
+mikudb/
+├── Cargo.toml                 # 工作空间配置
+├── Cargo.lock
+├── README.md
+├── LICENSE
+├── docs/                      # 文档
+│   ├── BOML-spec.md          # BOML 格式规范
+│   ├── MQL-spec.md           # MQL 语法规范
+│   ├── protocol.md           # 通信协议文档
+│   └── api/                  # API 文档
+├── crates/
+│   ├── mikudb-boml/          # BOML 格式库
+│   ├── mikudb-storage/       # 存储引擎
+│   ├── mikudb-query/         # 查询引擎
+│   ├── mikudb-server/        # 服务器
+│   ├── mikudb-cli/           # CLI 客户端
+│   ├── mikudb-mcp/           # MCP Server
+│   ├── mikudb-ai/            # AI 模块
+│   └── mikudb-common/        # 公共工具库
+├── config/
+│   └── mikudb.example.toml   # 示例配置
+├── scripts/
+│   ├── install.sh            # 安装脚本
+│   └── openeuler/            # OpenEuler 专用脚本
+├── systemd/
+│   └── mikudb.service        # systemd 服务文件
+├── tests/
+│   ├── integration/          # 集成测试
+│   └── benchmark/            # 性能基准测试
+└── tools/
+    ├── boml2json/            # BOML 转 JSON 工具
+    └── mongoimport/          # MongoDB 数据导入工具
+```
+
+---
+
+## 贡献指南
+
+1. Fork 本仓库
+2. 创建特性分支 (`git checkout -b feature/amazing-feature`)
+3. 提交更改 (`git commit -m 'Add amazing feature'`)
+4. 推送到分支 (`git push origin feature/amazing-feature`)
+5. 提交 Pull Request
+
+---
+
+## 许可证
+
+本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
