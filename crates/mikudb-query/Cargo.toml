@@ -1,0 +1,33 @@
+[package]
+name = "mikudb-query"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Query engine for MikuDB - MQL parser, optimizer, and executor"
+
+[dependencies]
+mikudb-common = { path = "../mikudb-common" }
+mikudb-boml = { path = "../mikudb-boml" }
+mikudb-storage = { path = "../mikudb-storage" }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+regex = { workspace = true }
+chrono = { workspace = true }
+indexmap = { version = "2.1", features = ["serde"] }
+compact_str = { version = "0.7", features = ["serde"] }
+
+logos = "0.14"
+pest = "2.7"
+pest_derive = "2.7"
+
+tantivy = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = { workspace = true }

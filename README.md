@@ -514,6 +514,236 @@ mikudb/
 
 ---
 
+## 编译指南
+
+### 系统要求
+
+- Rust 1.75+ (推荐使用 rustup 安装)
+- Clang/LLVM (用于编译 RocksDB 和 zstd)
+- CMake 3.16+
+
+### Windows 编译
+
+#### 1. 安装依赖
+
+```powershell
+# 安装 Rust
+winget install Rustlang.Rustup
+
+# 安装 Visual Studio Build Tools (包含 MSVC)
+winget install Microsoft.VisualStudio.2022.BuildTools
+
+# 安装 LLVM/Clang (必需，用于编译 zstd-sys 和 rocksdb)
+winget install LLVM.LLVM
+
+# 设置环境变量 (PowerShell)
+$env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
+# 永久设置 (以管理员身份运行)
+[Environment]::SetEnvironmentVariable("LIBCLANG_PATH", "C:\Program Files\LLVM\bin", "Machine")
+```
+
+#### 2. 编译项目
+
+```powershell
+# 克隆项目
+git clone https://github.com/your-repo/mikudb.git
+cd mikudb
+
+# 编译 (Debug 模式)
+cargo build
+
+# 编译 (Release 模式，推荐生产环境)
+cargo build --release
+
+# 仅检查代码 (不生成二进制)
+cargo check
+
+# 运行测试
+cargo test
+```
+
+#### 3. 常见问题
+
+**Q: 报错 "Unable to find libclang"**
+```
+A: 确保已安装 LLVM 并设置 LIBCLANG_PATH 环境变量
+   $env:LIBCLANG_PATH = "C:\Program Files\LLVM\bin"
+```
+
+**Q: 链接错误 "LINK : fatal error LNK1181"**
+```
+A: 确保已安装 Visual Studio Build Tools 及 C++ 开发工具
+```
+
+---
+
+### Linux 编译 (Ubuntu/Debian)
+
+#### 1. 安装依赖
+
+```bash
+# 更新包管理器
+sudo apt update
+
+# 安装 Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# 安装编译依赖
+sudo apt install -y build-essential cmake clang libclang-dev pkg-config libssl-dev
+```
+
+#### 2. 编译项目
+
+```bash
+# 克隆项目
+git clone https://github.com/your-repo/mikudb.git
+cd mikudb
+
+# 编译
+cargo build --release
+
+# 运行测试
+cargo test
+
+# 安装到系统 (可选)
+cargo install --path crates/mikudb-server
+```
+
+---
+
+### Linux 编译 (OpenEuler/RHEL/CentOS)
+
+#### 1. 安装依赖
+
+```bash
+# 安装 Rust
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
+source $HOME/.cargo/env
+
+# 安装编译依赖
+sudo dnf install -y gcc gcc-c++ cmake clang clang-devel openssl-devel pkg-config
+
+# OpenEuler 特定优化 (可选)
+sudo dnf install -y numactl-devel liburing-devel
+```
+
+#### 2. 编译项目
+
+```bash
+# 编译 (启用 OpenEuler 优化)
+cargo build --release --features openeuler
+
+# 不带优化特性编译
+cargo build --release
+```
+
+#### 3. 系统服务安装 (OpenEuler)
+
+```bash
+# 复制二进制文件
+sudo cp target/release/mikudb-server /usr/local/bin/
+
+# 创建数据目录
+sudo mkdir -p /var/lib/mikudb/data
+sudo mkdir -p /var/log/mikudb
+
+# 复制 systemd 服务文件
+sudo cp systemd/mikudb.service /etc/systemd/system/
+
+# 启用并启动服务
+sudo systemctl daemon-reload
+sudo systemctl enable mikudb
+sudo systemctl start mikudb
+
+# 查看状态
+sudo systemctl status mikudb
+```
+
+---
+
+### macOS 编译
+
+#### 1. 安装依赖
+
+```bash
+# 安装 Homebrew (如果没有)
+/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"
+
+# 安装 Rust
+brew install rustup-init
+rustup-init
+
+# 安装编译依赖
+brew install cmake llvm
+
+# 设置环境变量
+export LIBCLANG_PATH="$(brew --prefix llvm)/lib"
+```
+
+#### 2. 编译项目
+
+```bash
+cargo build --release
+```
+
+---
+
+### Docker 编译
+
+```dockerfile
+# Dockerfile
+FROM rust:1.75 as builder
+
+RUN apt-get update && apt-get install -y \
+    cmake clang libclang-dev pkg-config libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+COPY . .
+RUN cargo build --release
+
+FROM debian:bookworm-slim
+RUN apt-get update && apt-get install -y libssl3 && rm -rf /var/lib/apt/lists/*
+COPY --from=builder /app/target/release/mikudb-server /usr/local/bin/
+EXPOSE 3939
+CMD ["mikudb-server"]
+```
+
+```bash
+# 构建镜像
+docker build -t mikudb:latest .
+
+# 运行容器
+docker run -d -p 3939:3939 -v mikudb-data:/var/lib/mikudb mikudb:latest
+```
+
+---
+
+### 编译选项
+
+| Feature | 说明 | 命令 |
+|---------|------|------|
+| `default` | 默认特性 | `cargo build` |
+| `openeuler` | OpenEuler 优化 (io_uring) | `cargo build --features openeuler` |
+| `hugepages` | 大页内存支持 | `cargo build --features hugepages` |
+| `full` | 所有特性 | `cargo build --all-features` |
+
+### 验证安装
+
+```bash
+# 检查版本
+mikudb-server --version
+
+# 启动服务器
+mikudb-server
+
+# 使用 CLI 连接
+mikudb-cli --host localhost --port 3939 --user miku --password mikumiku3939
+```
+
+---
+
 ## 贡献指南
 
 1. Fork 本仓库

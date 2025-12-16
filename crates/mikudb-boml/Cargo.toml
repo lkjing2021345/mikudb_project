@@ -1,0 +1,30 @@
+[package]
+name = "mikudb-boml"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "BOML (Binary Object Markup Language) - MikuDB's binary document format"
+
+[dependencies]
+mikudb-common = { path = "../mikudb-common" }
+serde = { workspace = true }
+serde_json = { workspace = true }
+bytes = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+rust_decimal = { workspace = true }
+thiserror = { workspace = true }
+xxhash-rust = { workspace = true }
+indexmap = { version = "2.1", features = ["serde"] }
+smallvec = { version = "1.11", features = ["serde"] }
+compact_str = { version = "0.7", features = ["serde"] }
+
+[dev-dependencies]
+criterion = { workspace = true }
+proptest = { workspace = true }
+serde_json = { workspace = true }
+
+[[bench]]
+name = "boml_bench"
+harness = false

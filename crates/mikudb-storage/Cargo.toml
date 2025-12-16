@@ -1,0 +1,43 @@
+[package]
+name = "mikudb-storage"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Storage engine for MikuDB - based on RocksDB with OpenEuler optimizations"
+
+[dependencies]
+mikudb-common = { path = "../mikudb-common" }
+mikudb-boml = { path = "../mikudb-boml" }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+bytes = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+crossbeam = { workspace = true }
+dashmap = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+chrono = { workspace = true }
+
+rocksdb = { workspace = true, optional = true }
+lz4 = { workspace = true }
+zstd = { workspace = true, optional = true }
+xxhash-rust = { workspace = true }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+memmap2 = { workspace = true }
+nix = { version = "0.27", features = ["fs", "mman", "uio"] }
+
+[features]
+default = ["rocksdb", "zstd"]
+openeuler = ["mikudb-common/openeuler"]
+io_uring = []
+direct_io = []
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = { workspace = true }

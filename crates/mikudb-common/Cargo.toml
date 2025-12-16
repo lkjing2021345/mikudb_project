@@ -1,0 +1,30 @@
+[package]
+name = "mikudb-common"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "Common utilities and types for MikuDB"
+
+[dependencies]
+serde = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+chrono = { workspace = true }
+uuid = { workspace = true }
+bytes = { workspace = true }
+tracing = { workspace = true }
+parking_lot = { workspace = true }
+hex = "0.4"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# OpenEuler specific: use io_uring for async I/O when available
+io-uring = { version = "0.6", optional = true }
+nix = { version = "0.27", features = ["fs", "mman"] }
+
+[features]
+default = []
+# OpenEuler optimization: enable io_uring support for better async I/O performance
+openeuler = ["io-uring"]
+# Enable huge pages support for better memory performance on OpenEuler
+hugepages = []

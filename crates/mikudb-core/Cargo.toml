@@ -1,0 +1,35 @@
+[package]
+name = "mikudb-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+description = "MikuDB Core - High-performance document database for OpenEuler"
+
+[dependencies]
+mikudb-common = { path = "../mikudb-common" }
+mikudb-boml = { path = "../mikudb-boml" }
+mikudb-storage = { path = "../mikudb-storage" }
+mikudb-query = { path = "../mikudb-query" }
+
+serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+parking_lot = { workspace = true }
+tokio = { workspace = true }
+async-trait = { workspace = true }
+
+[features]
+default = []
+openeuler = [
+    "mikudb-common/openeuler",
+    "mikudb-storage/openeuler",
+]
+
+[dev-dependencies]
+tempfile = { workspace = true }
+criterion = { workspace = true }
+tokio-test = "0.4"
