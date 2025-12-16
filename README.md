@@ -92,42 +92,112 @@ mikudb/
 
 ---
 
+## 项目进度
+
+### 当前状态：v0.1.0 开发中
+
+#### 已完成模块
+
+| 模块 | 状态 | 说明 |
+|------|------|------|
+| mikudb-common | ✅ 完成 | 公共类型、错误处理、平台检测 |
+| mikudb-boml | ✅ 完成 | BOML 二进制格式序列化/反序列化 |
+| mikudb-storage | ✅ 完成 | 基于 RocksDB 的存储引擎 |
+| mikudb-query | ✅ 完成 | MQL 词法分析、解析器、执行器 |
+| mikudb-core | ✅ 完成 | 核心引擎整合层 |
+| mikudb-server | 🚧 待开发 | 数据库服务器 |
+| mikudb-cli | 🚧 待开发 | 命令行客户端 |
+
+#### 已实现功能
+
+**mikudb-boml (BOML 格式库)**
+- [x] 完整数据类型支持 (Null, Boolean, Int32/64/128, Float32/64, Decimal, String, Binary, DateTime, ObjectId, UUID, Array, Document)
+- [x] 高效序列化器 (encode_to_vec)
+- [x] 反序列化器 (decode)
+- [x] Serde 集成
+- [x] Document API (insert, get, remove, iter)
+- [x] 基准测试 (Criterion)
+
+**mikudb-storage (存储引擎)**
+- [x] RocksDB 集成
+- [x] Collection CRUD 操作
+- [x] WAL 日志模块
+- [x] LRU 缓存
+- [x] 压缩支持 (LZ4/Zstd)
+- [x] 后台压缩任务
+
+**mikudb-query (查询引擎)**
+- [x] MQL 词法分析器 (Logos)
+- [x] MQL 解析器
+- [x] AST 定义
+- [x] 查询计划器
+- [x] 查询执行器
+- [x] 过滤器引擎
+- [x] 索引管理
+
+**mikudb-core (核心引擎)**
+- [x] Database 管理
+- [x] Transaction 事务支持
+- [x] Session 会话管理
+- [x] Client 异步客户端
+- [x] ConnectionString 解析
+- [x] Cursor 游标迭代器
+- [x] Pipeline 聚合管道构建器
+- [x] Builder 模式配置
+
+**mikudb-common (公共库)**
+- [x] ObjectId 生成
+- [x] 错误类型定义
+- [x] 平台检测 (OpenEuler/Linux/Windows/macOS)
+- [x] 配置管理
+
+#### 编译状态
+
+| 平台 | 状态 | 备注 |
+|------|------|------|
+| Windows (MSVC) | ✅ 通过 | 需设置 BINDGEN_EXTRA_CLANG_ARGS |
+| Linux (Ubuntu) | ✅ 通过 | - |
+| Linux (OpenEuler) | ✅ 通过 | 支持 --features openeuler |
+| macOS | 🔄 未测试 | - |
+
+---
+
 ## 功能列表
 
 ### 第一阶段：核心引擎（v0.1.0）
 
 #### 1. BOML 格式解析器
-- [ ] 定义 BOML 规范文档
-- [ ] 实现基础数据类型
-  - [ ] Null、Boolean、Integer (i32/i64/i128)
-  - [ ] Float (f32/f64)、Decimal (高精度)
-  - [ ] String (UTF-8)、Binary (字节数组)
-  - [ ] DateTime、Timestamp、Date、Time
-  - [ ] ObjectId (12字节唯一标识)
-  - [ ] UUID
-  - [ ] Array、Document (嵌套文档)
+- [x] 定义 BOML 规范文档
+- [x] 实现基础数据类型
+  - [x] Null、Boolean、Integer (i32/i64/i128)
+  - [x] Float (f32/f64)、Decimal (高精度)
+  - [x] String (UTF-8)、Binary (字节数组)
+  - [x] DateTime、Timestamp、Date、Time
+  - [x] ObjectId (12字节唯一标识)
+  - [x] UUID
+  - [x] Array、Document (嵌套文档)
   - [ ] Regex、JavaScript (可选)
-- [ ] 实现序列化器 (Rust → BOML)
-- [ ] 实现反序列化器 (BOML → Rust)
-- [ ] Serde 集成支持
+- [x] 实现序列化器 (Rust → BOML)
+- [x] 实现反序列化器 (BOML → Rust)
+- [x] Serde 集成支持
 - [ ] 与 BSON/JSON 互转工具
-- [ ] 基准测试（对比 BSON 性能）
+- [x] 基准测试（对比 BSON 性能）
 
 #### 2. 存储引擎
-- [ ] 页面管理器 (Page Manager)
-  - [ ] 4KB/8KB/16KB 可配置页面大小
-  - [ ] 页面缓存 (LRU/CLOCK)
-  - [ ] 脏页刷写策略
-- [ ] WAL (Write-Ahead Logging)
-  - [ ] 日志记录格式
-  - [ ] 日志刷写策略
+- [x] 页面管理器 (Page Manager)
+  - [x] 4KB/8KB/16KB 可配置页面大小
+  - [x] 页面缓存 (LRU/CLOCK)
+  - [x] 脏页刷写策略
+- [x] WAL (Write-Ahead Logging)
+  - [x] 日志记录格式
+  - [x] 日志刷写策略
   - [ ] 崩溃恢复机制
-- [ ] 文档存储
-  - [ ] 变长记录存储
-  - [ ] 空闲空间管理
-  - [ ] 文档压缩 (LZ4/Zstd)
-- [ ] 索引引擎
-  - [ ] B+Tree 索引
+- [x] 文档存储
+  - [x] 变长记录存储
+  - [x] 空闲空间管理
+  - [x] 文档压缩 (LZ4/Zstd)
+- [x] 索引引擎
+  - [x] B+Tree 索引 (RocksDB)
   - [ ] 哈希索引
   - [ ] 复合索引
   - [ ] 唯一索引
@@ -135,25 +205,25 @@ mikudb/
   - [ ] TTL 索引
   - [ ] 全文索引 (基础)
   - [ ] 地理空间索引 (2dsphere)
-- [ ] 事务管理
-  - [ ] MVCC (多版本并发控制)
-  - [ ] 读已提交隔离级别
-  - [ ] 可重复读隔离级别
-  - [ ] 快照隔离
+- [x] 事务管理
+  - [x] MVCC (多版本并发控制)
+  - [x] 读已提交隔离级别
+  - [x] 可重复读隔离级别
+  - [x] 快照隔离
   - [ ] 分布式事务 (2PC)
 
 #### 3. 查询引擎
-- [ ] 查询解析器
-- [ ] 查询优化器
-  - [ ] 基于规则的优化 (RBO)
+- [x] 查询解析器
+- [x] 查询优化器
+  - [x] 基于规则的优化 (RBO)
   - [ ] 基于代价的优化 (CBO)
-  - [ ] 索引选择
-- [ ] 执行器
-  - [ ] 迭代器模型
+  - [x] 索引选择
+- [x] 执行器
+  - [x] 迭代器模型
   - [ ] 向量化执行 (可选)
-- [ ] 聚合管道
-  - [ ] $match, $project, $group
-  - [ ] $sort, $limit, $skip
+- [x] 聚合管道
+  - [x] $match, $project, $group
+  - [x] $sort, $limit, $skip
   - [ ] $lookup (关联查询)
   - [ ] $unwind, $bucket
 
