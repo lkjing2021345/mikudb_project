@@ -1,4 +1,3 @@
-use compact_str::CompactString;
 use mikudb_boml::BomlValue;
 use serde::{Deserialize, Serialize};
 

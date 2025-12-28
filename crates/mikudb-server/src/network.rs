@@ -2,7 +2,7 @@ use crate::config::ServerConfig;
 use crate::ServerResult;
 use socket2::{Domain, Protocol, Socket, Type};
 use std::net::SocketAddr;
-use tokio::net::{TcpStream, TcpListener as TokioTcpListener};
+use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
 use tracing::debug;
 
 pub struct TcpListener {

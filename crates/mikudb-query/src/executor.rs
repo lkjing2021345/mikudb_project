@@ -4,13 +4,12 @@
 
 use crate::ast::*;
 use crate::filter;
-use crate::planner::{PlanNode, QueryPlan, QueryPlanner};
+use crate::planner::QueryPlanner;
 use crate::{QueryError, QueryResult};
 use mikudb_boml::{BomlValue, Document};
-use mikudb_storage::{Collection, StorageEngine};
+use mikudb_storage::StorageEngine;
 use std::collections::HashMap;
 use std::sync::Arc;
-use tracing::{debug, trace};
 
 /// 查询执行器
 ///

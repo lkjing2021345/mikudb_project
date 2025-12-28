@@ -10,7 +10,7 @@
 //! - 针对 ARM64 架构优化的块大小配置
 
 use crate::{StorageError, StorageResult};
-use mikudb_boml::{codec, Document, BomlValue};
+use mikudb_boml::{codec, BomlValue, Document};
 use mikudb_common::config::CompressionType;
 use mikudb_common::platform::{linux, Platform};
 use mikudb_common::{CollectionName, DatabaseName, DocumentId, ObjectId};

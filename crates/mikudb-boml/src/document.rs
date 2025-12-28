@@ -8,7 +8,6 @@ use compact_str::CompactString;
 use indexmap::IndexMap;
 use mikudb_common::ObjectId;
 use serde::{Deserialize, Serialize};
-use std::ops::{Deref, DerefMut};
 
 /// BOML 文档结构
 ///

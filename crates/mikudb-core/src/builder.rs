@@ -14,8 +14,8 @@
 //!     .build()?;
 //! ```
 
-use crate::common::{MikuError, MikuResult};
 use crate::common::config::CompressionType;
+use crate::common::MikuResult;
 use crate::storage::StorageOptions;
 use crate::Database;
 use std::path::{Path, PathBuf};

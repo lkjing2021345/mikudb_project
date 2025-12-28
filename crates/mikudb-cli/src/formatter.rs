@@ -1,6 +1,5 @@
 use colored::Colorize;
 use serde_json::Value;
-use tabled::{Table, Tabled, settings::Style};
 
 pub struct Formatter {
     format: OutputFormat,

@@ -3,7 +3,6 @@ use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::hash::Hash;
 use std::sync::atomic::{AtomicU64, AtomicUsize, Ordering};
-use std::sync::Arc;
 
 pub struct LruCache<K, V>
 where

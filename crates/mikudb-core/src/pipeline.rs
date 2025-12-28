@@ -18,10 +18,9 @@
 
 use crate::boml::BomlValue;
 use crate::query::{
-    AggregateStage, AggregateFunction, Accumulator, Expression, SortField, SortOrder,
-    ProjectField, BinaryOp, UnaryOp,
+    Accumulator, AggregateFunction, AggregateStage, Expression, ProjectField, SortField,
+    SortOrder,
 };
-use std::collections::HashMap;
 
 #[derive(Debug, Clone, Default)]
 pub struct Pipeline {

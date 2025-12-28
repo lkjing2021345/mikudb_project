@@ -1,5 +1,5 @@
 use criterion::{criterion_group, criterion_main, Criterion};
-use mikudb_boml::{Document, BomlValue, encode_to_vec, decode};
+use mikudb_boml::{decode, encode_to_vec, Document};
 
 fn bench_document_creation(c: &mut Criterion) {
     c.bench_function("document_create", |b| {

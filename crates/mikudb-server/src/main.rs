@@ -2,7 +2,7 @@ use clap::Parser;
 use mikudb_server::{Server, ServerConfig};
 use std::path::PathBuf;
 use std::sync::Arc;
-use tracing::{info, error};
+use tracing::{error, info};
 
 #[derive(Parser, Debug)]
 #[command(name = "mikudb-server")]

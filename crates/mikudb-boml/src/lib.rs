@@ -37,9 +37,9 @@ pub mod ser;
 pub mod de;
 pub mod spec;
 
-pub use value::BomlValue;
+pub use codec::{decode, encode, encode_to_vec};
 pub use document::Document;
-pub use codec::{encode, decode, encode_to_vec};
+pub use value::BomlValue;
 
 use thiserror::Error;
 

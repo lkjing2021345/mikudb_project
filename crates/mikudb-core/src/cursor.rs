@@ -3,7 +3,7 @@
 //! 提供查询结果的迭代器接口，支持批量获取、流式处理和游标管理。
 
 use crate::boml::Document;
-use crate::common::{MikuError, MikuResult, ObjectId};
+use crate::common::{MikuError, MikuResult};
 use parking_lot::Mutex;
 use std::collections::VecDeque;
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};

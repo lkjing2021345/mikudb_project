@@ -1,6 +1,6 @@
 use crate::config::AuthConfig;
-use sha2::{Sha256, Digest};
-use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64};
+use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use sha2::{Digest, Sha256};
 
 pub struct Authenticator {
     default_user: String,

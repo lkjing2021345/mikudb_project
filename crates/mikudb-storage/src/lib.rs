@@ -4,8 +4,8 @@ pub mod wal;
 pub mod cache;
 pub mod compaction;
 
-pub use engine::{StorageEngine, StorageOptions};
 pub use collection::Collection;
+pub use engine::{StorageEngine, StorageOptions};
 
 use thiserror::Error;
 

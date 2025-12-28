@@ -1,7 +1,6 @@
 use crate::value::BomlValue;
 use crate::BomlError;
 use compact_str::CompactString;
-use indexmap::IndexMap;
 use serde::de::{self, DeserializeSeed, IntoDeserializer, MapAccess, SeqAccess, Visitor};
 use serde::Deserialize;
 use std::fmt;

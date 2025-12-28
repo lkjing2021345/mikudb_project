@@ -9,7 +9,6 @@ use indexmap::IndexMap;
 use mikudb_common::ObjectId;
 use rust_decimal::Decimal;
 use serde::{Deserialize, Serialize};
-use smallvec::SmallVec;
 use std::fmt;
 use uuid::Uuid;
 

@@ -1,8 +1,8 @@
 use crate::client::Client;
 use crate::formatter::Formatter;
-use crate::{CliError, CliResult, Config};
-use std::path::Path;
+use crate::{CliResult, Config};
 use std::fs;
+use std::path::Path;
 
 pub struct Cli {
     client: Client,
