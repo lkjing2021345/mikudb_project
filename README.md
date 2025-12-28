@@ -921,7 +921,7 @@ docker run -d -p 3939:3939 -v mikudb-data:/var/lib/mikudb mikudb:latest
 | `default` | 默认特性 | `cargo build` |
 | `openeuler` | OpenEuler 优化 (io_uring) | `cargo build --features openeuler` |
 | `hugepages` | 大页内存支持 | `cargo build --features hugepages` |
-| `full` | 所有特性 | `cargo build --all-features` |
+| `full` | 所有特性 | `cargo build --all-features` |[    
 
 ### 验证安装
 
@@ -951,4 +951,4 @@ mikudb-cli --host localhost --port 3939 --user miku --password mikumiku3939
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件
+本项目采用 GNU 许可证 - 详见 [LICENSE](LICENSE) 文件
