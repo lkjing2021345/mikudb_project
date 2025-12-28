@@ -20,7 +20,7 @@ hex = "0.4"
 [target.'cfg(target_os = "linux")'.dependencies]
 # OpenEuler specific: use io_uring for async I/O when available
 io-uring = { version = "0.6", optional = true }
-nix = { version = "0.27", features = ["fs", "mman"] }
+nix = { version = "0.27", features = ["fs", "mman", "sched", "process"] }
 
 [features]
 default = []
