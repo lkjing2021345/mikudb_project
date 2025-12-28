@@ -193,15 +193,51 @@ impl ClientHandler {
     }
 
     async fn handle_query(&mut self, payload: &[u8], request_id: u32, response_to: u32) -> ServerResult<Message> {
-        let query_req: QueryRequest = serde_json::from_slice(payload)
-            .map_err(|e| ServerError::Protocol(format!("Invalid query request: {}", e)))?;
+        let query_req: QueryRequest = match serde_json::from_slice(payload) {
+            Ok(req) => req,
+            Err(e) => {
+                let error_response = QueryResponse {
+                    success: false,
+                    affected: 0,
+                    documents: vec![],
+                    cursor_id: None,
+                    message: Some(format!("Invalid query request: {}", e)),
+                };
+                let payload = serde_json::to_vec(&error_response).unwrap_or_default();
+                return Ok(Message::response(request_id, response_to, payload));
+            }
+        };
 
-        let statement = Parser::parse(&query_req.query)
-            .map_err(|e| ServerError::Query(e))?;
+        let statement = match Parser::parse(&query_req.query) {
+            Ok(stmt) => stmt,
+            Err(e) => {
+                let error_response = QueryResponse {
+                    success: false,
+                    affected: 0,
+                    documents: vec![],
+                    cursor_id: None,
+                    message: Some(format!("Parse error: {}", e)),
+                };
+                let payload = serde_json::to_vec(&error_response).unwrap_or_default();
+                return Ok(Message::response(request_id, response_to, payload));
+            }
+        };
 
         let executor = QueryExecutor::new(self.storage.clone());
-        let result = executor.execute(&statement)
-            .map_err(|e| ServerError::Query(e))?;
+        let result = match executor.execute(&statement) {
+            Ok(res) => res,
+            Err(e) => {
+                let error_response = QueryResponse {
+                    success: false,
+                    affected: 0,
+                    documents: vec![],
+                    cursor_id: None,
+                    message: Some(format!("Execution error: {}", e)),
+                };
+                let payload = serde_json::to_vec(&error_response).unwrap_or_default();
+                return Ok(Message::response(request_id, response_to, payload));
+            }
+        };
 
         use mikudb_query::QueryResponse as QR;
 

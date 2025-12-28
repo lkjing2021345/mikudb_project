@@ -90,11 +90,20 @@ impl Client {
         let result: serde_json::Value = serde_json::from_slice(&response)
             .map_err(|e| CliError::Parse(format!("Invalid response: {}", e)))?;
 
+        let success = result["success"].as_bool().unwrap_or(false);
+        let message = result["message"].as_str().map(String::from);
+
+        if !success {
+            if let Some(msg) = message {
+                return Err(CliError::Query(msg));
+            }
+        }
+
         Ok(QueryResult {
-            success: result["success"].as_bool().unwrap_or(false),
+            success,
             affected: result["affected"].as_u64().unwrap_or(0),
             documents: result["documents"].as_array().cloned().unwrap_or_default(),
-            message: result["message"].as_str().map(String::from),
+            message,
         })
     }
 
@@ -111,20 +120,38 @@ impl Client {
         buf.extend_from_slice(&(payload.len() as u32).to_le_bytes());
         buf.extend_from_slice(payload);
 
-        self.stream.write_all(&buf).await?;
-        self.stream.flush().await?;
+        self.stream.write_all(&buf).await.map_err(|e| {
+            CliError::Connection(format!("Failed to send request: {}. Connection may be closed.", e))
+        })?;
+        self.stream.flush().await.map_err(|e| {
+            CliError::Connection(format!("Failed to flush: {}. Connection may be closed.", e))
+        })?;
 
         let mut header_buf = [0u8; 20];
-        self.stream.read_exact(&mut header_buf).await?;
+        self.stream.read_exact(&mut header_buf).await.map_err(|e| {
+            CliError::Connection(format!("Failed to read response header: {}. Server may have closed the connection.", e))
+        })?;
 
         if &header_buf[0..4] != MAGIC_BYTES {
-            return Err(CliError::Parse("Invalid response magic bytes".into()));
+            return Err(CliError::Parse("Invalid response magic bytes. Protocol mismatch or corrupted data.".into()));
         }
 
+        let response_opcode = header_buf[5];
         let payload_len = u32::from_le_bytes([header_buf[16], header_buf[17], header_buf[18], header_buf[19]]) as usize;
 
+        if payload_len > 64 * 1024 * 1024 {
+            return Err(CliError::Parse(format!("Response payload too large: {} bytes", payload_len)));
+        }
+
         let mut payload_buf = vec![0u8; payload_len];
-        self.stream.read_exact(&mut payload_buf).await?;
+        self.stream.read_exact(&mut payload_buf).await.map_err(|e| {
+            CliError::Connection(format!("Failed to read response payload: {}. Expected {} bytes.", e, payload_len))
+        })?;
+
+        if response_opcode == 0x81 {
+            let error_msg = String::from_utf8_lossy(&payload_buf);
+            return Err(CliError::Server(error_msg.to_string()));
+        }
 
         Ok(payload_buf)
     }

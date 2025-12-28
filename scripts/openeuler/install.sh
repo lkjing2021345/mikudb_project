@@ -70,19 +70,37 @@ create_directories() {
 }
 
 install_binary() {
-    log_info "Installing MikuDB binary..."
+    log_info "Installing MikuDB server binary..."
 
     if [ -f "./target/release/mikudb-server" ]; then
         cp ./target/release/mikudb-server "$INSTALL_DIR/bin/"
         chmod 755 "$INSTALL_DIR/bin/mikudb-server"
+        log_info "MikuDB server installed to $INSTALL_DIR/bin/mikudb-server"
     else
         log_error "Binary not found. Please run 'cargo build --release' first"
         exit 1
     fi
+}
 
+install_cli() {
     if [ -f "./target/release/mikudb-cli" ]; then
-        cp ./target/release/mikudb-cli "$INSTALL_DIR/bin/"
-        chmod 755 "$INSTALL_DIR/bin/mikudb-cli"
+        echo
+        read -p "Do you want to install mikudb-cli? [Y/n] " -n 1 -r
+        echo
+        if [[ $REPLY =~ ^[Yy]$ ]] || [[ -z $REPLY ]]; then
+            log_info "Installing MikuDB CLI..."
+            cp ./target/release/mikudb-cli "$INSTALL_DIR/bin/"
+            chmod 755 "$INSTALL_DIR/bin/mikudb-cli"
+            log_info "MikuDB CLI installed to $INSTALL_DIR/bin/mikudb-cli"
+            return 0
+        else
+            log_info "Skipping MikuDB CLI installation"
+            return 1
+        fi
+    else
+        log_warn "MikuDB CLI binary not found at ./target/release/mikudb-cli"
+        log_warn "You can build it later with: cargo build --release -p mikudb-cli"
+        return 1
     fi
 }
 
@@ -160,6 +178,10 @@ main() {
     create_user
     create_directories
     install_binary
+
+    local cli_installed=false
+    install_cli && cli_installed=true
+
     install_config
     install_systemd
 
@@ -172,8 +194,15 @@ main() {
     echo "To check status:"
     echo "  sudo systemctl status mikudb"
     echo
-    echo "To connect:"
-    echo "  mikudb-cli --host localhost --port 3939 --user miku --password mikumiku3939"
+
+    if [ "$cli_installed" = true ]; then
+        echo "To connect using CLI:"
+        echo "  mikudb-cli --host localhost --port 3939 --user miku --password mikumiku3939"
+    else
+        echo "To install CLI later:"
+        echo "  cargo build --release -p mikudb-cli"
+        echo "  sudo cp target/release/mikudb-cli $INSTALL_DIR/bin/"
+    fi
     echo
 }
 

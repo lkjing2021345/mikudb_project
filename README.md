@@ -684,6 +684,19 @@ cargo check
 
 # 运行测试
 cargo test
+
+# 仅编译 CLI 客户端
+cargo build --release -p mikudb-cli
+
+# 仅编译服务器
+cargo build --release -p mikudb-server
+
+# 直接运行 CLI
+cargo run -p mikudb-cli -- --help
+
+# 编译后的二进制文件位置
+# Debug: target\debug\mikudb-cli.exe, target\debug\mikudb-server.exe
+# Release: target\release\mikudb-cli.exe, target\release\mikudb-server.exe
 ```
 
 #### 3. 常见问题
@@ -730,8 +743,23 @@ cargo build --release
 # 运行测试
 cargo test
 
+# 仅编译 CLI 客户端
+cargo build --release -p mikudb-cli
+
+# 仅编译服务器
+cargo build --release -p mikudb-server
+
 # 安装到系统 (可选)
 cargo install --path crates/mikudb-server
+cargo install --path crates/mikudb-cli
+
+# 或手动复制二进制文件
+sudo cp target/release/mikudb-server /usr/local/bin/
+sudo cp target/release/mikudb-cli /usr/local/bin/
+
+# 或使用安装脚本 (推荐)
+sudo bash scripts/install.sh
+# 安装脚本会询问是否安装 CLI,默认为 Yes
 ```
 
 ---
@@ -760,14 +788,30 @@ cargo build --release --features openeuler
 
 # 不带优化特性编译
 cargo build --release
+
+# 仅编译 CLI 客户端
+cargo build --release -p mikudb-cli
+
+# 仅编译服务器
+cargo build --release -p mikudb-server
 ```
 
-#### 3. 系统服务安装 (OpenEuler)
+#### 3. 安装到系统 (OpenEuler)
 
 ```bash
-# 复制二进制文件
-sudo cp target/release/mikudb-server /usr/local/bin/
+# 方式 1: 使用安装脚本 (推荐，包含完整的 systemd 服务配置)
+sudo bash scripts/openeuler/install.sh
+# 脚本会自动询问是否安装 mikudb-cli,默认为 Yes
 
+# 方式 2: 使用 cargo install
+cargo install --path crates/mikudb-server
+cargo install --path crates/mikudb-cli
+
+# 方式 3: 手动复制二进制文件
+sudo cp target/release/mikudb-server /usr/local/bin/
+sudo cp target/release/mikudb-cli /usr/local/bin/
+
+# 如果使用方式 2 或 3,还需要手动创建目录和配置
 # 创建数据目录
 sudo mkdir -p /var/lib/mikudb/data
 sudo mkdir -p /var/log/mikudb
@@ -782,6 +826,9 @@ sudo systemctl start mikudb
 
 # 查看状态
 sudo systemctl status mikudb
+
+# 验证 CLI 安装
+mikudb-cli --version
 ```
 
 ---
@@ -809,6 +856,28 @@ export LIBCLANG_PATH="$(brew --prefix llvm)/lib"
 
 ```bash
 cargo build --release
+
+# 仅编译 CLI 客户端
+cargo build --release -p mikudb-cli
+
+# 仅编译服务器
+cargo build --release -p mikudb-server
+```
+
+#### 3. 安装到系统 (可选)
+
+```bash
+# 方式 1: 使用 cargo install (推荐)
+cargo install --path crates/mikudb-server
+cargo install --path crates/mikudb-cli
+
+# 方式 2: 手动复制二进制文件
+sudo cp target/release/mikudb-server /usr/local/bin/
+sudo cp target/release/mikudb-cli /usr/local/bin/
+
+# 验证安装
+mikudb-server --version
+mikudb-cli --version
 ```
 
 ---
@@ -830,6 +899,7 @@ RUN cargo build --release
 FROM debian:bookworm-slim
 RUN apt-get update && apt-get install -y libssl3 && rm -rf /var/lib/apt/lists/*
 COPY --from=builder /app/target/release/mikudb-server /usr/local/bin/
+COPY --from=builder /app/target/release/mikudb-cli /usr/local/bin/
 EXPOSE 3939
 CMD ["mikudb-server"]
 ```
@@ -858,6 +928,7 @@ docker run -d -p 3939:3939 -v mikudb-data:/var/lib/mikudb mikudb:latest
 ```bash
 # 检查版本
 mikudb-server --version
+mikudb-cli --version
 
 # 启动服务器
 mikudb-server

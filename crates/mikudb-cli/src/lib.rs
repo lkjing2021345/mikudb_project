@@ -48,6 +48,9 @@ pub enum CliError {
     #[error("Query error: {0}")]
     Query(String),
 
+    #[error("Server error: {0}")]
+    Server(String),
+
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
 
