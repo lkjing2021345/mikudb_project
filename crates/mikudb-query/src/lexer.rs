@@ -15,16 +15,10 @@ pub enum Token {
     Drop,
     #[token("DATABASE", ignore(ascii_case))]
     Database,
-    #[token("DATABASES", ignore(ascii_case))]
-    Databases,
     #[token("COLLECTION", ignore(ascii_case))]
     Collection,
-    #[token("COLLECTIONS", ignore(ascii_case))]
-    Collections,
     #[token("INDEX", ignore(ascii_case))]
     Index,
-    #[token("INDEXES", ignore(ascii_case))]
-    Indexes,
     #[token("UNIQUE", ignore(ascii_case))]
     Unique,
     #[token("TEXT", ignore(ascii_case))]

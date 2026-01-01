@@ -158,15 +158,15 @@ impl<'a> Parser<'a> {
     fn parse_show(&mut self) -> QueryResult<Statement> {
         self.expect(Token::Show)?;
         match self.peek() {
-            Some(Token::Databases) => {
+            Some(Token::Database) => {
                 self.next();
                 Ok(Statement::ShowDatabases)
             }
-            Some(Token::Collections) => {
+            Some(Token::Collection) => {
                 self.next();
                 Ok(Statement::ShowCollections)
             }
-            Some(Token::Indexes) => {
+            Some(Token::Index) => {
                 self.next();
                 self.expect(Token::On)?;
                 let collection = self.parse_identifier()?;
@@ -181,7 +181,7 @@ impl<'a> Parser<'a> {
                 Ok(Statement::ShowUsers)
             }
             _ => Err(QueryError::Syntax(
-                "Expected DATABASES, COLLECTIONS, INDEXES, STATUS, or USERS".to_string(),
+                "Expected DATABASE, COLLECTION, INDEX, STATUS, or USERS".to_string(),
             )),
         }
     }

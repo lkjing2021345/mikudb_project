@@ -314,12 +314,12 @@ mikudb/
 
 // 数据库操作
 USE database_name
-SHOW DATABASES
+SHOW DATABASE
 CREATE DATABASE db_name
 DROP DATABASE db_name
 
 // 集合操作
-SHOW COLLECTIONS
+SHOW COLLECTION
 CREATE COLLECTION collection_name
 DROP COLLECTION collection_name
 
@@ -357,7 +357,7 @@ CREATE INDEX idx_name ON collection_name (field1 ASC, field2 DESC)
 CREATE UNIQUE INDEX idx_name ON collection_name (field)
 CREATE TEXT INDEX idx_name ON collection_name (field)
 DROP INDEX idx_name ON collection_name
-SHOW INDEXES ON collection_name
+SHOW INDEX ON collection_name
 
 // 事务
 BEGIN TRANSACTION

@@ -52,7 +52,7 @@ impl rustyline::hint::Hinter for MqlHelper {
             ("DELETE", " FROM collection_name WHERE condition"),
             ("CREATE", " COLLECTION collection_name"),
             ("DROP", " COLLECTION collection_name"),
-            ("SHOW", " COLLECTIONS"),
+            ("SHOW", " COLLECTION"),
             ("USE", " database_name"),
         ];
 
@@ -259,8 +259,8 @@ impl Repl {
   DELETE FROM <collection> WHERE ...      - Delete documents
 
 {}
-  SHOW DATABASES                          - List databases
-  SHOW COLLECTIONS                        - List collections
+  SHOW DATABASE                           - List databases
+  SHOW COLLECTION                         - List collections
   CREATE COLLECTION <name>                - Create collection
   DROP COLLECTION <name>                  - Drop collection
   CREATE INDEX <name> ON <col> (fields)   - Create index
