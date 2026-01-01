@@ -61,9 +61,17 @@ impl ClientHandler {
                 }
 
                 let payload = buf.split_to(header.payload_len as usize).to_vec();
+                let client_request_id = header.request_id;
                 let message = Message { header, payload };
 
-                let response = self.process_message(message).await?;
+                let response = match self.process_message(message).await {
+                    Ok(msg) => msg,
+                    Err(e) => {
+                        error!("Error processing message from conn {}: {}", self.conn_id, e);
+                        let request_id = REQUEST_ID_COUNTER.fetch_add(1, Ordering::SeqCst);
+                        Message::error(request_id, client_request_id, &format!("Internal error: {}", e))
+                    }
+                };
 
                 let encoded = response.encode();
                 self.stream.write_all(&encoded).await?;
