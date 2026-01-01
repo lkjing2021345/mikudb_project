@@ -1,6 +1,6 @@
 use crate::client::Client;
 use crate::formatter::Formatter;
-use crate::{CliResult, Config};
+use crate::{CliResult, Config, CliError};
 use std::fs;
 use std::path::Path;
 
