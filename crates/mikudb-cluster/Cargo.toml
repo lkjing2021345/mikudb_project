@@ -1,0 +1,56 @@
+[package]
+name = "mikudb-cluster"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+authors.workspace = true
+
+[dependencies]
+# Workspace dependencies
+mikudb-common = { path = "../mikudb-common" }
+mikudb-boml = { path = "../mikudb-boml" }
+mikudb-storage = { path = "../mikudb-storage" }
+
+# Async runtime
+tokio = { workspace = true }
+async-trait = { workspace = true }
+futures = { workspace = true }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+bincode = { workspace = true }
+
+# Networking
+bytes = { workspace = true }
+
+# Concurrency
+parking_lot = { workspace = true }
+crossbeam = { workspace = true }
+dashmap = { workspace = true }
+
+# Error handling
+thiserror = { workspace = true }
+anyhow = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+
+# Time
+chrono = { workspace = true }
+
+# Hashing
+xxhash-rust = { workspace = true }
+
+# Raft consensus library (comment out for Windows compatibility)
+# openraft = { version = "0.9", features = ["serde"] }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+proptest = { workspace = true }
+
+[features]
+default = []
+openeuler = []

@@ -9,9 +9,13 @@ pub mod session;
 #[cfg(target_os = "linux")]
 pub mod openeuler;
 
+#[cfg(feature = "tls")]
+pub mod tls;
+
 pub use config::ServerConfig;
 pub use server::Server;
 pub use session::{Session, SessionManager};
+pub use auth::{UserManager, Privilege, RoleAssignment};
 
 use thiserror::Error;
 
@@ -40,6 +44,9 @@ pub enum ServerError {
 
     #[error("Protocol error: {0}")]
     Protocol(String),
+
+    #[error("TLS error: {0}")]
+    Tls(String),
 
     #[error("Connection closed")]
     ConnectionClosed,

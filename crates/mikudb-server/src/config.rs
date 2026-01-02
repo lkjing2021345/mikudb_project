@@ -128,17 +128,103 @@ impl Default for AuthConfig {
 
 /// TLS/SSL 配置
 ///
-/// HTTPS 加密连接配置(当前未实现)。
+/// HTTPS/TLS 加密连接配置。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TlsConfig {
+    /// 是否启用 TLS (默认: false)
     #[serde(default)]
     pub enabled: bool,
 
+    /// 服务器证书文件路径 (PEM 格式)
     #[serde(default)]
     pub cert_file: Option<PathBuf>,
 
+    /// 服务器私钥文件路径 (PEM 格式)
     #[serde(default)]
     pub key_file: Option<PathBuf>,
+
+    /// CA 证书文件路径 (用于客户端证书验证,可选)
+    #[serde(default)]
+    pub ca_file: Option<PathBuf>,
+
+    /// 是否要求客户端证书认证 (默认: false)
+    #[serde(default)]
+    pub require_client_cert: bool,
+
+    /// TLS 最低协议版本 (默认: "TLS1.2")
+    #[serde(default = "default_tls_min_version")]
+    pub min_protocol_version: String,
+
+    /// TLS 最高协议版本 (默认: "TLS1.3")
+    #[serde(default = "default_tls_max_version")]
+    pub max_protocol_version: String,
+}
+
+fn default_tls_min_version() -> String {
+    "TLS1.2".to_string()
+}
+
+fn default_tls_max_version() -> String {
+    "TLS1.3".to_string()
+}
+
+impl TlsConfig {
+    /// 验证 TLS 配置是否有效
+    pub fn validate(&self) -> Result<(), ServerError> {
+        if !self.enabled {
+            return Ok(());
+        }
+
+        if self.cert_file.is_none() {
+            return Err(ServerError::Config(
+                "TLS enabled but cert_file not specified".to_string(),
+            ));
+        }
+
+        if self.key_file.is_none() {
+            return Err(ServerError::Config(
+                "TLS enabled but key_file not specified".to_string(),
+            ));
+        }
+
+        // 检查证书文件是否存在
+        if let Some(ref cert) = self.cert_file {
+            if !cert.exists() {
+                return Err(ServerError::Config(format!(
+                    "Certificate file not found: {}",
+                    cert.display()
+                )));
+            }
+        }
+
+        // 检查私钥文件是否存在
+        if let Some(ref key) = self.key_file {
+            if !key.exists() {
+                return Err(ServerError::Config(format!(
+                    "Private key file not found: {}",
+                    key.display()
+                )));
+            }
+        }
+
+        // 检查 CA 文件是否存在(如果需要客户端证书)
+        if self.require_client_cert {
+            if let Some(ref ca) = self.ca_file {
+                if !ca.exists() {
+                    return Err(ServerError::Config(format!(
+                        "CA file not found: {}",
+                        ca.display()
+                    )));
+                }
+            } else {
+                return Err(ServerError::Config(
+                    "require_client_cert is true but ca_file not specified".to_string(),
+                ));
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// 日志配置

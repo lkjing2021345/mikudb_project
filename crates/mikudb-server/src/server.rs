@@ -11,6 +11,7 @@ use crate::config::ServerConfig;
 use crate::handler::ClientHandler;
 use crate::network::TcpListener;
 use crate::session::SessionManager;
+use crate::auth::UserManager;
 use crate::{ServerError, ServerResult};
 use mikudb_core::Database;
 use mikudb_storage::{StorageEngine, StorageOptions};
@@ -20,6 +21,11 @@ use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 use tokio::sync::Semaphore;
 use tracing::{debug, error, info, warn};
+
+#[cfg(feature = "tls")]
+use crate::network::StreamType;
+#[cfg(feature = "tls")]
+use tokio::sync::OwnedSemaphorePermit;
 
 /// MikuDB 服务器
 ///
@@ -34,6 +40,8 @@ pub struct Server {
     storage: Arc<StorageEngine>,
     /// 会话管理器(共享)
     session_manager: Arc<SessionManager>,
+    /// 用户管理器(共享)
+    user_manager: Arc<UserManager>,
     /// 连接信号量,限制最大并发连接数
     connection_semaphore: Arc<Semaphore>,
     /// 服务器运行状态
@@ -76,15 +84,18 @@ impl Server {
         };
 
         info!("Initializing storage engine at {:?}", config.data_dir);
-        // 打开 RocksDB 存储引擎
         let storage = Arc::new(StorageEngine::open(storage_opts)?);
 
-        // 创建会话管理器(会话超时时间 1 小时)
         let session_manager = Arc::new(SessionManager::new(
             std::time::Duration::from_secs(3600),
         ));
 
-        // 创建连接信号量,限制最大并发连接数
+        let user_manager = Arc::new(UserManager::new(storage.clone()));
+
+        if config.auth.enabled {
+            user_manager.initialize().await?;
+        }
+
         let connection_semaphore = Arc::new(Semaphore::new(config.max_connections));
 
         Ok(Self {
@@ -92,6 +103,7 @@ impl Server {
             databases: RwLock::new(HashMap::new()),
             storage,
             session_manager,
+            user_manager,
             connection_semaphore,
             running: AtomicBool::new(false),
             connections_count: AtomicU64::new(0),
@@ -118,6 +130,11 @@ impl Server {
 
         info!("MikuDB server listening on {}", addr);
 
+        #[cfg(feature = "tls")]
+        if self.config.tls.enabled {
+            info!("TLS enabled - accepting encrypted connections");
+        }
+
         // 在 Linux 上同时启用 Unix Socket 支持
         #[cfg(target_os = "linux")]
         if let Some(ref socket_path) = self.config.unix_socket {
@@ -129,17 +146,43 @@ impl Server {
             // 获取连接许可(阻塞直到有可用槽位)
             let permit = self.connection_semaphore.clone().acquire_owned().await;
 
+            #[cfg(feature = "tls")]
+            let accept_result = if self.config.tls.enabled {
+                listener.accept_tls().await.map(|(stream, addr)| (Some(stream), addr))
+            } else {
+                listener.accept().await.map(|(stream, addr)| (None, addr))
+            };
+
+            #[cfg(not(feature = "tls"))]
+            let accept_result = listener.accept().await.map(|(stream, addr)| (stream, addr));
+
             // 接受新连接
-            match listener.accept().await {
+            match accept_result {
+                #[cfg(feature = "tls")]
+                Ok((Some(tls_stream), addr)) => {
+                    let permit = permit.map_err(|_| ServerError::Internal("Semaphore closed".into()))?;
+                    let server = self.clone();
+                    let conn_id = self.connections_count.fetch_add(1, Ordering::SeqCst);
+
+                    debug!("New TLS connection {} from {}", conn_id, addr);
+
+                    tokio::spawn(async move {
+                        if let Err(e) = handle_tls_connection(conn_id, tls_stream, server, permit).await {
+                            if !matches!(e, ServerError::ConnectionClosed) {
+                                warn!("TLS connection {} error: {}", conn_id, e);
+                            }
+                        }
+                        debug!("TLS connection {} closed", conn_id);
+                    });
+                }
+                #[cfg(not(feature = "tls"))]
                 Ok((stream, addr)) => {
                     let permit = permit.map_err(|_| ServerError::Internal("Semaphore closed".into()))?;
                     let server = self.clone();
-                    // 分配唯一的连接 ID
                     let conn_id = self.connections_count.fetch_add(1, Ordering::SeqCst);
 
                     debug!("New connection {} from {}", conn_id, addr);
 
-                    // 为每个连接创建独立的异步任务
                     tokio::spawn(async move {
                         let handler = ClientHandler::new(
                             conn_id,
@@ -149,7 +192,6 @@ impl Server {
                             server.config.clone(),
                         );
 
-                        // 处理客户端请求,直到连接关闭
                         if let Err(e) = handler.handle().await {
                             if !matches!(e, ServerError::ConnectionClosed) {
                                 warn!("Connection {} error: {}", conn_id, e);
@@ -157,7 +199,35 @@ impl Server {
                         }
 
                         debug!("Connection {} closed", conn_id);
-                        // 释放连接许可,允许新连接进入
+                        drop(permit);
+                    });
+                }
+                #[cfg(feature = "tls")]
+                Ok((None, addr)) => {
+                    let permit = permit.map_err(|_| ServerError::Internal("Semaphore closed".into()))?;
+                    let server = self.clone();
+                    let conn_id = self.connections_count.fetch_add(1, Ordering::SeqCst);
+
+                    debug!("New connection {} from {}", conn_id, addr);
+
+                    tokio::spawn(async move {
+                        if let Ok((stream, _)) = listener.accept().await {
+                            let handler = ClientHandler::new(
+                                conn_id,
+                                stream,
+                                server.storage.clone(),
+                                server.session_manager.clone(),
+                                server.config.clone(),
+                            );
+
+                            if let Err(e) = handler.handle().await {
+                                if !matches!(e, ServerError::ConnectionClosed) {
+                                    warn!("Connection {} error: {}", conn_id, e);
+                                }
+                            }
+                        }
+
+                        debug!("Connection {} closed", conn_id);
                         drop(permit);
                     });
                 }
@@ -211,4 +281,49 @@ pub struct ServerStats {
     pub total_connections: u64,
     pub total_requests: u64,
     pub active_sessions: usize,
+}
+
+#[cfg(feature = "tls")]
+async fn handle_tls_connection(
+    conn_id: u64,
+    stream: StreamType,
+    server: Arc<Server>,
+    permit: OwnedSemaphorePermit,
+) -> ServerResult<()> {
+    use tokio::io::{AsyncReadExt, AsyncWriteExt};
+    use crate::protocol::*;
+
+    match stream {
+        StreamType::Tls(mut tls_stream) => {
+            let mut buf = vec![0u8; 4096];
+            loop {
+                match tls_stream.read(&mut buf).await {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        if let Err(e) = tls_stream.write_all(&buf[..n]).await {
+                            warn!("TLS write error on connection {}: {}", conn_id, e);
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("TLS read error on connection {}: {}", conn_id, e);
+                        break;
+                    }
+                }
+            }
+        }
+        StreamType::Tcp(stream) => {
+            let handler = ClientHandler::new(
+                conn_id,
+                stream,
+                server.storage.clone(),
+                server.session_manager.clone(),
+                server.config.clone(),
+            );
+            handler.handle().await?;
+        }
+    }
+
+    drop(permit);
+    Ok(())
 }

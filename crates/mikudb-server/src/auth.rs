@@ -7,8 +7,13 @@
 //! - 数据库级别权限检查
 
 use crate::config::AuthConfig;
+use crate::{ServerError, ServerResult};
 use base64::{engine::general_purpose::STANDARD as BASE64, Engine as _};
+use mikudb_storage::StorageEngine;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
+use std::sync::Arc;
+use chrono::{DateTime, Utc};
 
 /// 认证器
 ///
@@ -175,14 +180,40 @@ impl User {
 
 /// 权限类型枚举
 ///
-/// 定义三种基本权限类型。
+/// 定义数据库操作的细粒度权限。
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Privilege {
+    Find,
+    Count,
+    Aggregate,
+    ListCollections,
+    ListIndexes,
+    Insert,
+    Update,
+    Delete,
+    CreateCollection,
+    DropCollection,
+    RenameCollection,
+    CreateIndex,
+    DropIndex,
+    DropDatabase,
+    CompactDatabase,
+    CreateUser,
+    UpdateUser,
+    DropUser,
+    GrantRole,
+    RevokeRole,
+    AddNode,
+    RemoveNode,
+    Shutdown,
+    ServerStatus,
+}
+
+/// 权限类型枚举 (兼容旧代码)
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Permission {
-    /// 读权限
     Read,
-    /// 写权限
     Write,
-    /// 管理员权限
     Admin,
 }
 
@@ -203,10 +234,242 @@ pub enum Permission {
 /// # Returns
 /// true 表示具有权限,false 表示无权限
 pub fn check_permission(user: &User, _database: &str, _collection: &str, permission: Permission) -> bool {
-    // 根据权限类型检查角色
     match permission {
         Permission::Read => user.has_role("read") || user.has_role("readWrite") || user.has_role("root"),
         Permission::Write => user.has_role("readWrite") || user.has_role("root"),
         Permission::Admin => user.has_role("root"),
     }
+}
+
+/// 角色分配
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub struct RoleAssignment {
+    pub role: String,
+    pub db: String,
+}
+
+/// 用户凭证 (SCRAM-SHA-256)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UserCredentials {
+    pub salt: String,
+    pub stored_key: String,
+    pub server_key: String,
+    pub iterations: u32,
+}
+
+/// 持久化用户对象
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct StoredUser {
+    #[serde(rename = "_id")]
+    pub id: String,
+    pub username: String,
+    pub credentials: UserCredentials,
+    pub roles: Vec<RoleAssignment>,
+    pub created_at: DateTime<Utc>,
+    pub updated_at: DateTime<Utc>,
+}
+
+/// 用户管理器
+pub struct UserManager {
+    storage: Arc<StorageEngine>,
+}
+
+impl UserManager {
+    pub fn new(storage: Arc<StorageEngine>) -> Self {
+        Self { storage }
+    }
+
+    pub async fn initialize(&self) -> ServerResult<()> {
+        use mikudb_boml::Document;
+        use tracing::warn;
+
+        let admin_db = "admin";
+        let users_collection = "users";
+
+        let collections = self.storage.list_collections(admin_db)?;
+        if !collections.contains(&users_collection.to_string()) {
+            warn!("Initializing authentication system...");
+            warn!("Creating admin.users collection");
+
+            let initial_password = "mikudb_initial_password";
+            let root_user = self.create_user_internal(
+                "root",
+                initial_password,
+                vec![RoleAssignment {
+                    role: "root".to_string(),
+                    db: "*".to_string(),
+                }],
+            )?;
+
+            let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
+
+            let mut user_doc = Document::new();
+            user_doc.insert("_id".to_string(), root_user.id.clone().into());
+            user_doc.insert("username".to_string(), root_user.username.into());
+
+            let mut cred_doc = Document::new();
+            cred_doc.insert("salt".to_string(), root_user.credentials.salt.into());
+            cred_doc.insert("storedKey".to_string(), root_user.credentials.stored_key.into());
+            cred_doc.insert("serverKey".to_string(), root_user.credentials.server_key.into());
+            cred_doc.insert("iterations".to_string(), (root_user.credentials.iterations as i64).into());
+            user_doc.insert("credentials".to_string(), cred_doc.into());
+
+            let roles_vec: Vec<mikudb_boml::BomlValue> = root_user.roles.iter().map(|r| {
+                let mut role_doc = Document::new();
+                role_doc.insert("role".to_string(), r.role.clone().into());
+                role_doc.insert("db".to_string(), r.db.clone().into());
+                role_doc.into()
+            }).collect();
+            user_doc.insert("roles".to_string(), roles_vec.into());
+
+            collection.insert(user_doc)?;
+
+            warn!("⚠️  Initial root user created");
+            warn!("⚠️  Username: root");
+            warn!("⚠️  Password: {}", initial_password);
+            warn!("⚠️  Please change the password immediately using:");
+            warn!("   ALTER USER \"root\" PASSWORD \"your_secure_password\";");
+        }
+
+        Ok(())
+    }
+
+    fn create_user_internal(
+        &self,
+        username: &str,
+        password: &str,
+        roles: Vec<RoleAssignment>,
+    ) -> ServerResult<StoredUser> {
+        let credentials = create_scram_credentials(password, 10000)?;
+        Ok(StoredUser {
+            id: username.to_string(),
+            username: username.to_string(),
+            credentials,
+            roles,
+            created_at: Utc::now(),
+            updated_at: Utc::now(),
+        })
+    }
+
+    pub async fn authenticate(&self, username: &str, password: &str) -> ServerResult<User> {
+        use mikudb_boml::{Document, BomlValue};
+
+        let admin_db = "admin";
+        let users_collection = "users";
+
+        let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
+
+        let mut filter = Document::new();
+        filter.insert("username".to_string(), username.into());
+        let docs = collection.find(Some(filter), None)?;
+
+        if docs.is_empty() {
+            return Err(ServerError::AuthFailed("User not found".to_string()));
+        }
+
+        let user_doc = &docs[0];
+        let stored_username = user_doc.get("username")
+            .and_then(|v| if let BomlValue::String(s) = v { Some(s.as_str()) } else { None })
+            .ok_or_else(|| ServerError::Internal("Missing username field".to_string()))?;
+
+        let cred_doc = user_doc.get("credentials")
+            .and_then(|v| if let BomlValue::Document(d) = v { Some(d) } else { None })
+            .ok_or_else(|| ServerError::Internal("Missing credentials field".to_string()))?;
+
+        let credentials = UserCredentials {
+            salt: cred_doc.get("salt")
+                .and_then(|v| if let BomlValue::String(s) = v { Some(s.clone()) } else { None })
+                .ok_or_else(|| ServerError::Internal("Missing salt".to_string()))?,
+            stored_key: cred_doc.get("storedKey")
+                .and_then(|v| if let BomlValue::String(s) = v { Some(s.clone()) } else { None })
+                .ok_or_else(|| ServerError::Internal("Missing storedKey".to_string()))?,
+            server_key: cred_doc.get("serverKey")
+                .and_then(|v| if let BomlValue::String(s) = v { Some(s.clone()) } else { None })
+                .ok_or_else(|| ServerError::Internal("Missing serverKey".to_string()))?,
+            iterations: cred_doc.get("iterations")
+                .and_then(|v| if let BomlValue::Int64(i) = v { Some(*i as u32) } else { None })
+                .unwrap_or(10000),
+        };
+
+        if !verify_scram_password(password, &credentials)? {
+            return Err(ServerError::AuthFailed("Invalid password".to_string()));
+        }
+
+        let roles_vec = user_doc.get("roles")
+            .and_then(|v| if let BomlValue::Array(arr) = v { Some(arr) } else { None })
+            .ok_or_else(|| ServerError::Internal("Missing roles".to_string()))?;
+
+        let mut roles = Vec::new();
+        let mut databases = Vec::new();
+        for role_val in roles_vec {
+            if let BomlValue::Document(role_doc) = role_val {
+                if let (Some(BomlValue::String(role)), Some(BomlValue::String(db))) =
+                    (role_doc.get("role"), role_doc.get("db")) {
+                    roles.push(role.clone());
+                    databases.push(db.clone());
+                }
+            }
+        }
+
+        Ok(User {
+            username: stored_username.to_string(),
+            password_hash: String::new(),
+            roles,
+            databases,
+        })
+    }
+}
+
+fn create_scram_credentials(password: &str, iterations: u32) -> ServerResult<UserCredentials> {
+    use rand::Rng;
+
+    let mut rng = rand::thread_rng();
+    let salt: Vec<u8> = (0..16).map(|_| rng.gen()).collect();
+
+    let salted_password = pbkdf2_sha256(password.as_bytes(), &salt, iterations);
+
+    let client_key = hmac_sha256(&salted_password, b"Client Key");
+    let stored_key = sha256(&client_key);
+    let server_key = hmac_sha256(&salted_password, b"Server Key");
+
+    Ok(UserCredentials {
+        salt: BASE64.encode(&salt),
+        stored_key: BASE64.encode(&stored_key),
+        server_key: BASE64.encode(&server_key),
+        iterations,
+    })
+}
+
+fn verify_scram_password(password: &str, credentials: &UserCredentials) -> ServerResult<bool> {
+    let salt = BASE64
+        .decode(&credentials.salt)
+        .map_err(|e| ServerError::Internal(format!("Invalid salt: {}", e)))?;
+
+    let salted_password = pbkdf2_sha256(password.as_bytes(), &salt, credentials.iterations);
+    let client_key = hmac_sha256(&salted_password, b"Client Key");
+    let stored_key = sha256(&client_key);
+
+    Ok(BASE64.encode(&stored_key) == credentials.stored_key)
+}
+
+fn pbkdf2_sha256(password: &[u8], salt: &[u8], iterations: u32) -> Vec<u8> {
+    use sha2::Sha256;
+    let mut result = vec![0u8; 32];
+    pbkdf2::pbkdf2::<hmac::Hmac<Sha256>>(password, salt, iterations, &mut result)
+        .expect("PBKDF2 derivation failed");
+    result
+}
+
+fn hmac_sha256(key: &[u8], data: &[u8]) -> Vec<u8> {
+    use hmac::{Hmac, Mac};
+    use sha2::Sha256;
+    let mut mac = Hmac::<Sha256>::new_from_slice(key).expect("HMAC initialization failed");
+    mac.update(data);
+    mac.finalize().into_bytes().to_vec()
+}
+
+fn sha256(data: &[u8]) -> Vec<u8> {
+    let mut hasher = Sha256::new();
+    hasher.update(data);
+    hasher.finalize().to_vec()
 }

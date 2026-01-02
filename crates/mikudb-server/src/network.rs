@@ -13,12 +13,22 @@ use std::net::SocketAddr;
 use tokio::net::{TcpListener as TokioTcpListener, TcpStream};
 use tracing::debug;
 
+#[cfg(feature = "tls")]
+use tokio_rustls::server::TlsStream;
+#[cfg(feature = "tls")]
+use std::sync::Arc;
+#[cfg(feature = "tls")]
+use rustls::ServerConfig as RustlsServerConfig;
+
 /// TCP 监听器
 ///
 /// 封装 Tokio TcpListener,并应用各种性能优化。
 pub struct TcpListener {
     /// Tokio 异步 TCP 监听器
     inner: TokioTcpListener,
+    /// TLS 配置(可选)
+    #[cfg(feature = "tls")]
+    tls_config: Option<Arc<RustlsServerConfig>>,
 }
 
 impl TcpListener {
@@ -53,7 +63,28 @@ impl TcpListener {
         let std_listener: std::net::TcpListener = socket.into();
         let inner = TokioTcpListener::from_std(std_listener)?;;
 
-        Ok(Self { inner })
+        #[cfg(feature = "tls")]
+        let tls_config = if config.tls.enabled {
+            config.tls.validate()?;
+            use crate::tls::TlsConfigBuilder;
+            let cert_path = config.tls.cert_file.as_ref().unwrap();
+            let key_path = config.tls.key_file.as_ref().unwrap();
+            let ca_path = config.tls.ca_file.as_deref();
+            Some(TlsConfigBuilder::build_server_config(
+                cert_path,
+                key_path,
+                ca_path,
+                config.tls.require_client_cert,
+            )?)
+        } else {
+            None
+        };
+
+        Ok(Self {
+            inner,
+            #[cfg(feature = "tls")]
+            tls_config,
+        })
     }
 
     /// # Brief
@@ -76,6 +107,32 @@ impl TcpListener {
 
         Ok((stream, addr))
     }
+
+    #[cfg(feature = "tls")]
+    pub async fn accept_tls(&self) -> ServerResult<(StreamType, SocketAddr)> {
+        let (stream, addr) = self.inner.accept().await?;
+
+        #[cfg(target_os = "linux")]
+        {
+            use std::os::unix::io::AsRawFd;
+            let fd = stream.as_raw_fd();
+            optimize_connection_socket(fd);
+        }
+
+        if let Some(ref tls_config) = self.tls_config {
+            let acceptor = tokio_rustls::TlsAcceptor::from(tls_config.clone());
+            let tls_stream = acceptor.accept(stream).await?;
+            Ok((StreamType::Tls(tls_stream), addr))
+        } else {
+            Ok((StreamType::Tcp(stream), addr))
+        }
+    }
+}
+
+#[cfg(feature = "tls")]
+pub enum StreamType {
+    Tcp(TcpStream),
+    Tls(TlsStream<TcpStream>),
 }
 
 /// # Brief

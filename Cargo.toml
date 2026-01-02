@@ -7,7 +7,7 @@ members = [
     "crates/mikudb-query",
     "crates/mikudb-common",
     "crates/mikudb-server",
-    "crates/mikudb-cli",
+    "crates/mikudb-cli", "crates/mikudb-cluster",
 ]
 
 [workspace.package]

@@ -19,9 +19,15 @@ pub mod collection;
 pub mod wal;
 pub mod cache;
 pub mod compaction;
+pub mod recovery;
+pub mod index;
+pub mod fulltext;
 
 pub use collection::Collection;
 pub use engine::{StorageEngine, StorageOptions};
+pub use recovery::{RecoveryManager, RecoveryStats};
+pub use index::{IndexDefinition, IndexEngine, IndexField, IndexOrder, IndexType};
+pub use fulltext::{FullTextIndex, FullTextIndexDefinition, IndexStats, TokenizerType};
 
 use thiserror::Error;
 

@@ -188,6 +188,8 @@ impl DatabaseBuilder {
                 compression: self.compression,
                 enable_statistics: self.enable_statistics,
                 paranoid_checks: self.paranoid_checks,
+                enable_wal: true,
+                wal_sync_on_write: false,
 
                 #[cfg(target_os = "linux")]
                 use_direct_reads: self.use_direct_reads,

@@ -17,6 +17,11 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::TcpStream;
 use tracing::{error, trace};
 
+#[cfg(feature = "tls")]
+use crate::network::StreamType;
+#[cfg(feature = "tls")]
+use tokio_rustls::server::TlsStream;
+
 /// 全局请求 ID 计数器,用于为每个响应生成唯一 ID
 static REQUEST_ID_COUNTER: AtomicU32 = AtomicU32::new(1);
 

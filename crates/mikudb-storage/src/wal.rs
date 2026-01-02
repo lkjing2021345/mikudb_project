@@ -603,6 +603,44 @@ impl WriteAheadLog {
         info!("Replayed {} WAL records", count);
         Ok(count)
     }
+
+    /// # Brief
+    /// 截断 WAL 文件
+    ///
+    /// 清空 WAL 文件,仅保留魔数字节和版本号。
+    /// 在成功执行 checkpoint 后调用。
+    ///
+    /// # Returns
+    /// 成功或错误
+    pub fn truncate(&self) -> StorageResult<()> {
+        let mut writer = self.writer.lock();
+        writer.flush()?;
+        writer.get_ref().sync_all()?;
+        drop(writer);
+
+        // 截断文件并重新写入头部
+        let file = OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(true)
+            .open(&self.path)?;
+
+        let mut new_writer = BufWriter::new(file);
+        new_writer.write_all(&WAL_MAGIC)?;
+        new_writer.write_all(&[WAL_VERSION])?;
+        new_writer.flush()?;
+
+        // 更新写入器
+        let mut writer = self.writer.lock();
+        *writer = BufWriter::new(OpenOptions::new().append(true).open(&self.path)?);
+
+        // 重置文件大小和 LSN
+        self.file_size.store(5, Ordering::Relaxed);
+        self.lsn.store(0, Ordering::SeqCst);
+
+        info!("WAL truncated at {:?}", self.path);
+        Ok(())
+    }
 }
 
 #[cfg(test)]

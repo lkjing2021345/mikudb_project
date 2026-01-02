@@ -25,8 +25,8 @@ struct Args {
     port: u16,
 
     /// 用户名
-    #[arg(short, long, default_value = "miku")]
-    user: String,
+    #[arg(short, long)]
+    user: Option<String>,
 
     /// 密码(未指定时交互式输入)
     #[arg(short = 'P', long)]
@@ -72,27 +72,35 @@ async fn main() -> anyhow::Result<()> {
     // 解析命令行参数
     let args = Args::parse();
 
-    // 处理密码输入
-    let password = match args.password {
-        Some(p) => p,
+    let user = match args.user {
+        Some(u) => u,
         None => {
-            // 非交互模式使用默认密码
             if args.execute.is_some() || args.file.is_some() {
-                "mikumiku3939".to_string()
-            } else {
-                // 交互模式提示输入密码
-                dialoguer::Password::new()
-                    .with_prompt("Password")
-                    .interact()?
+                return Err(anyhow::anyhow!("Username required in non-interactive mode. Use -u <username>"));
             }
+            dialoguer::Input::new()
+                .with_prompt("Username")
+                .default("root".to_string())
+                .interact_text()?
         }
     };
 
-    // 构造配置
+    let password = match args.password {
+        Some(p) => p,
+        None => {
+            if args.execute.is_some() || args.file.is_some() {
+                return Err(anyhow::anyhow!("Password required in non-interactive mode. Use -P <password>"));
+            }
+            dialoguer::Password::new()
+                .with_prompt(format!("Password for {}", user))
+                .interact()?
+        }
+    };
+
     let config = Config {
         host: args.host,
         port: args.port,
-        user: args.user,
+        user,
         password,
         database: args.database,
         format: args.format,

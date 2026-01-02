@@ -41,6 +41,13 @@ socket2 = { version = "0.5", features = ["all"] }
 sha2 = { workspace = true }
 base64 = "0.22"
 rand = "0.8"
+pbkdf2 = "0.12"
+hmac = "0.12"
+
+# TLS/SSL support
+tokio-rustls = { version = "0.26", optional = true }
+rustls = { version = "0.23", optional = true }
+rustls-pemfile = { version = "2.0", optional = true }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 nix = { version = "0.27", features = ["net", "socket", "uio", "fs"] }
@@ -51,6 +58,7 @@ default = []
 openeuler = ["mikudb-core/openeuler", "mikudb-storage/openeuler"]
 io_uring = []
 numa = []
+tls = ["dep:tokio-rustls", "dep:rustls", "dep:rustls-pemfile"]
 
 [dev-dependencies]
 tempfile = { workspace = true }

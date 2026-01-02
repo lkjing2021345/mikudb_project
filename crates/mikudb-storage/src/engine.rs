@@ -10,6 +10,8 @@
 //! - 针对 ARM64 架构优化的块大小配置
 
 use crate::{StorageError, StorageResult};
+use crate::wal::WriteAheadLog;
+use crate::recovery::{RecoveryManager, RecoveryStats};
 use mikudb_boml::{codec, BomlValue, Document};
 use mikudb_common::config::CompressionType;
 use mikudb_common::platform::{linux, Platform};
@@ -41,6 +43,8 @@ pub struct StorageOptions {
     pub compression: CompressionType,
     pub enable_statistics: bool,
     pub paranoid_checks: bool,
+    pub enable_wal: bool,
+    pub wal_sync_on_write: bool,
 
     #[cfg(target_os = "linux")]
     pub use_direct_reads: bool,
@@ -73,6 +77,8 @@ impl Default for StorageOptions {
             compression: CompressionType::Lz4,
             enable_statistics: true,
             paranoid_checks: true,
+            enable_wal: true,
+            wal_sync_on_write: false,
 
             #[cfg(target_os = "linux")]
             use_direct_reads,
@@ -130,6 +136,7 @@ pub struct StorageEngine {
     options: StorageOptions,
     collections: RwLock<HashMap<String, Arc<crate::collection::Collection>>>,
     block_cache: Arc<Cache>,
+    wal: Option<Arc<WriteAheadLog>>,
 }
 
 impl StorageEngine {
@@ -251,13 +258,49 @@ impl StorageEngine {
             DB::open_cf_descriptors(&db_opts, &options.data_dir, cf_descriptors)?
         };
 
+        let db = Arc::new(db);
+
         info!("Storage engine opened at {:?}", options.data_dir);
 
+        // 初始化 WAL 并执行崩溃恢复
+        let wal = if options.enable_wal {
+            let wal_path = options.data_dir.join("wal").join("mikudb.wal");
+            let wal = Arc::new(WriteAheadLog::open(wal_path, options.wal_sync_on_write)?);
+
+            info!("WAL enabled, performing crash recovery...");
+            let recovery = RecoveryManager::new(db.clone(), wal.clone());
+            match recovery.recover() {
+                Ok(stats) => {
+                    if stats.total_replayed > 0 {
+                        info!(
+                            "Crash recovery completed: {} transactions, {} operations ({} inserts, {} updates, {} deletes)",
+                            stats.transactions_recovered,
+                            stats.total_replayed,
+                            stats.inserts_replayed,
+                            stats.updates_replayed,
+                            stats.deletes_replayed
+                        );
+                    } else {
+                        info!("No recovery needed, database is consistent");
+                    }
+                }
+                Err(e) => {
+                    warn!("Crash recovery failed: {}", e);
+                }
+            }
+
+            Some(wal)
+        } else {
+            info!("WAL disabled, crash recovery unavailable");
+            None
+        };
+
         Ok(Self {
-            db: Arc::new(db),
+            db,
             options,
             collections: RwLock::new(HashMap::new()),
             block_cache: Arc::new(block_cache),
+            wal,
         })
     }
 

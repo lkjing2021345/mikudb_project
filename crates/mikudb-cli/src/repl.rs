@@ -294,6 +294,11 @@ impl Repl {
         println!(" {} v{}", t!("welcome.title"), env!("CARGO_PKG_VERSION"));
         println!(" {}", t!("welcome.help"));
         println!();
+        println!(" [Auth] Logged in as: {}", self.client.user().green().bold());
+        if let Some(db) = &self.current_database {
+            println!(" [DB] Current database: {}", db.cyan());
+        }
+        println!();
     }
 
     /// # Brief
@@ -346,6 +351,14 @@ impl Repl {
                 self.print_status().await;
                 Ok(true)
             }
+            "passwd" | "password" => {
+                self.change_password().await?;
+                Ok(true)
+            }
+            "whoami" => {
+                println!("Current user: {}", self.client.user().green().bold());
+                Ok(true)
+            }
             "lang" | "language" => {
                 if parts.len() > 1 {
                     if let Some(lang) = Language::from_str(parts[1]) {
@@ -361,6 +374,47 @@ impl Repl {
             }
             _ => Ok(false),
         }
+    }
+
+    async fn change_password(&self) -> CliResult<()> {
+        use dialoguer::Password;
+
+        println!("{}", "Change Password".green().bold());
+        println!();
+
+        let old_password = Password::new()
+            .with_prompt("Current password")
+            .interact()
+            .map_err(|e| CliError::Other(format!("Failed to read password: {}", e)))?;
+
+        let new_password = Password::new()
+            .with_prompt("New password")
+            .with_confirmation("Confirm new password", "Passwords do not match")
+            .interact()
+            .map_err(|e| CliError::Other(format!("Failed to read new password: {}", e)))?;
+
+        if new_password.len() < 8 {
+            println!("{}", "[X] Password must be at least 8 characters".red());
+            return Ok(());
+        }
+
+        let query = format!(
+            "ALTER USER \"{}\" PASSWORD \"{}\"",
+            self.client.user(),
+            new_password
+        );
+
+        match self.client.execute(&query).await {
+            Ok(_) => {
+                println!("{}", "[OK] Password changed successfully".green());
+                println!("{}", "[!] Please reconnect with the new password".yellow());
+            }
+            Err(e) => {
+                println!("{} {}", "[X] Failed to change password:".red(), e);
+            }
+        }
+
+        Ok(())
     }
 
     /// # Brief
