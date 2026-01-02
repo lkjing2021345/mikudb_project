@@ -8,7 +8,7 @@
 
 use crate::client::Client;
 use crate::formatter::Formatter;
-use crate::{CliResult, Config, CliError};
+use crate::{CliResult, Config};
 use std::fs;
 use std::path::Path;
 

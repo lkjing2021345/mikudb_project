@@ -99,7 +99,7 @@ sudo systemctl enable mikudb
 ### 查看服务状态
 
 ```bash
-systemctl status mikudb --no-pager
+systemctl status mikudb
 ```
 
 ---
@@ -109,7 +109,7 @@ systemctl status mikudb --no-pager
 ### 正确示例（MQL）
 
 ```bash
-mikudb-cli -e "SHOW DATABASES"
+mikudb-cli -e "SHOW DATABASE"
 ```
 
 说明：

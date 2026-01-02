@@ -286,7 +286,7 @@ impl UserManager {
         let admin_db = "admin";
         let users_collection = "users";
 
-        let collections = self.storage.list_collections(admin_db)?;
+        let collections = self.storage.list_collections()?;
         if !collections.contains(&users_collection.to_string()) {
             warn!("Initializing authentication system...");
             warn!("Creating admin.users collection");
@@ -304,30 +304,30 @@ impl UserManager {
             let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
 
             let mut user_doc = Document::new();
-            user_doc.insert("_id".to_string(), root_user.id.clone().into());
-            user_doc.insert("username".to_string(), root_user.username.into());
+            user_doc.insert("_id".to_string(), mikudb_boml::BomlValue::String(root_user.id.clone().into()));
+            user_doc.insert("username".to_string(), mikudb_boml::BomlValue::String(root_user.username.into()));
 
             let mut cred_doc = Document::new();
-            cred_doc.insert("salt".to_string(), root_user.credentials.salt.into());
-            cred_doc.insert("storedKey".to_string(), root_user.credentials.stored_key.into());
-            cred_doc.insert("serverKey".to_string(), root_user.credentials.server_key.into());
-            cred_doc.insert("iterations".to_string(), (root_user.credentials.iterations as i64).into());
-            user_doc.insert("credentials".to_string(), cred_doc.into());
+            cred_doc.insert("salt".to_string(), mikudb_boml::BomlValue::String(root_user.credentials.salt.into()));
+            cred_doc.insert("storedKey".to_string(), mikudb_boml::BomlValue::String(root_user.credentials.stored_key.into()));
+            cred_doc.insert("serverKey".to_string(), mikudb_boml::BomlValue::String(root_user.credentials.server_key.into()));
+            cred_doc.insert("iterations".to_string(), mikudb_boml::BomlValue::Int64(root_user.credentials.iterations as i64));
+            user_doc.insert("credentials".to_string(), cred_doc);
 
             let roles_vec: Vec<mikudb_boml::BomlValue> = root_user.roles.iter().map(|r| {
                 let mut role_doc = Document::new();
-                role_doc.insert("role".to_string(), r.role.clone().into());
-                role_doc.insert("db".to_string(), r.db.clone().into());
-                role_doc.into()
+                role_doc.insert("role".to_string(), mikudb_boml::BomlValue::String(r.role.clone().into()));
+                role_doc.insert("db".to_string(), mikudb_boml::BomlValue::String(r.db.clone().into()));
+                mikudb_boml::BomlValue::from(role_doc)
             }).collect();
-            user_doc.insert("roles".to_string(), roles_vec.into());
+            user_doc.insert("roles".to_string(), mikudb_boml::BomlValue::Array(roles_vec));
 
-            collection.insert(user_doc)?;
+            collection.insert(&mut user_doc)?;
 
-            warn!("⚠️  Initial root user created");
-            warn!("⚠️  Username: root");
-            warn!("⚠️  Password: {}", initial_password);
-            warn!("⚠️  Please change the password immediately using:");
+            warn!("Initial root user created");
+            warn!("Username: root");
+            warn!("Password: {}", initial_password);
+            warn!("Please change the password immediately using:");
             warn!("   ALTER USER \"root\" PASSWORD \"your_secure_password\";");
         }
 
@@ -359,15 +359,19 @@ impl UserManager {
 
         let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
 
-        let mut filter = Document::new();
-        filter.insert("username".to_string(), username.into());
-        let docs = collection.find(Some(filter), None)?;
+        let docs = collection.find_all()?;
+        let matching_docs: Vec<_> = docs.into_iter().filter(|doc| {
+            doc.get("username")
+                .and_then(|v| if let BomlValue::String(s) = v { Some(s.as_str()) } else { None })
+                .map(|s| s == username)
+                .unwrap_or(false)
+        }).collect();
 
-        if docs.is_empty() {
+        if matching_docs.is_empty() {
             return Err(ServerError::AuthFailed("User not found".to_string()));
         }
 
-        let user_doc = &docs[0];
+        let user_doc = &matching_docs[0];
         let stored_username = user_doc.get("username")
             .and_then(|v| if let BomlValue::String(s) = v { Some(s.as_str()) } else { None })
             .ok_or_else(|| ServerError::Internal("Missing username field".to_string()))?;
@@ -378,13 +382,13 @@ impl UserManager {
 
         let credentials = UserCredentials {
             salt: cred_doc.get("salt")
-                .and_then(|v| if let BomlValue::String(s) = v { Some(s.clone()) } else { None })
+                .and_then(|v| if let BomlValue::String(s) = v { Some(s.to_string()) } else { None })
                 .ok_or_else(|| ServerError::Internal("Missing salt".to_string()))?,
             stored_key: cred_doc.get("storedKey")
-                .and_then(|v| if let BomlValue::String(s) = v { Some(s.clone()) } else { None })
+                .and_then(|v| if let BomlValue::String(s) = v { Some(s.to_string()) } else { None })
                 .ok_or_else(|| ServerError::Internal("Missing storedKey".to_string()))?,
             server_key: cred_doc.get("serverKey")
-                .and_then(|v| if let BomlValue::String(s) = v { Some(s.clone()) } else { None })
+                .and_then(|v| if let BomlValue::String(s) = v { Some(s.to_string()) } else { None })
                 .ok_or_else(|| ServerError::Internal("Missing serverKey".to_string()))?,
             iterations: cred_doc.get("iterations")
                 .and_then(|v| if let BomlValue::Int64(i) = v { Some(*i as u32) } else { None })
@@ -405,8 +409,8 @@ impl UserManager {
             if let BomlValue::Document(role_doc) = role_val {
                 if let (Some(BomlValue::String(role)), Some(BomlValue::String(db))) =
                     (role_doc.get("role"), role_doc.get("db")) {
-                    roles.push(role.clone());
-                    databases.push(db.clone());
+                    roles.push(role.to_string());
+                    databases.push(db.to_string());
                 }
             }
         }

@@ -376,13 +376,13 @@ impl Repl {
         }
     }
 
-    async fn change_password(&self) -> CliResult<()> {
+    async fn change_password(&mut self) -> CliResult<()> {
         use dialoguer::Password;
 
         println!("{}", "Change Password".green().bold());
         println!();
 
-        let old_password = Password::new()
+        let _old_password = Password::new()
             .with_prompt("Current password")
             .interact()
             .map_err(|e| CliError::Other(format!("Failed to read password: {}", e)))?;
@@ -404,7 +404,7 @@ impl Repl {
             new_password
         );
 
-        match self.client.execute(&query).await {
+        match self.client.query(&query).await {
             Ok(_) => {
                 println!("{}", "[OK] Password changed successfully".green());
                 println!("{}", "[!] Please reconnect with the new password".yellow());
