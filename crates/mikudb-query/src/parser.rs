@@ -109,6 +109,12 @@ impl<'a> Parser<'a> {
     fn parse_identifier(&mut self) -> QueryResult<String> {
         match self.next() {
             Some(Token::Identifier(s)) | Some(Token::QuotedIdentifier(s)) => Ok(s),
+            Some(Token::Users) => Ok("users".to_string()),
+            Some(Token::User) => Ok("user".to_string()),
+            Some(Token::Status) => Ok("status".to_string()),
+            Some(Token::Index) => Ok("index".to_string()),
+            Some(Token::Collection) => Ok("collection".to_string()),
+            Some(Token::Database) => Ok("database".to_string()),
             Some(t) => Err(QueryError::Syntax(format!(
                 "Expected identifier, got {:?}",
                 t

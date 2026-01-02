@@ -13,7 +13,7 @@ impl MqlCompleter {
                 "SET", "AND", "OR", "NOT", "IN", "LIKE", "BETWEEN", "IS", "NULL",
                 "SELECT", "ORDER", "BY", "ASC", "DESC", "LIMIT", "SKIP", "OFFSET",
                 "CREATE", "DROP", "ALTER", "INDEX", "COLLECTION", "DATABASE",
-                "SHOW", "USE", "DATABASES", "COLLECTIONS", "INDEXES",
+                "SHOW", "USE", "STATUS", "USERS", "USER",
                 "BEGIN", "COMMIT", "ROLLBACK", "TRANSACTION",
                 "AGGREGATE", "MATCH", "GROUP", "SORT", "PROJECT", "LOOKUP",
                 "UNWIND", "BUCKET", "AS", "ON", "UNIQUE", "TEXT", "TTL",
@@ -26,14 +26,24 @@ impl MqlCompleter {
     }
 
     pub fn complete(&self, line: &str, pos: usize) -> Result<(usize, Vec<String>)> {
-        let line_to_cursor = &line[..pos];
+        let line_to_cursor = if pos <= line.len() {
+            &line[..pos]
+        } else {
+            line
+        };
 
         let word_start = line_to_cursor
-            .rfind(|c: char| c.is_whitespace() || c == '(' || c == '{' || c == '[' || c == ',')
-            .map(|i| i + 1)
+            .char_indices()
+            .rev()
+            .find(|(_, c)| c.is_whitespace() || *c == '(' || *c == '{' || *c == '[' || *c == ',')
+            .map(|(i, c)| i + c.len_utf8())
             .unwrap_or(0);
 
-        let prefix = &line_to_cursor[word_start..];
+        let prefix = if word_start <= line_to_cursor.len() {
+            &line_to_cursor[word_start..]
+        } else {
+            ""
+        };
 
         if prefix.is_empty() {
             return Ok((pos, vec![]));
@@ -75,9 +85,9 @@ impl MqlCompleter {
 
         if upper.ends_with("SHOW ") {
             completions.extend(vec![
-                "DATABASES".to_string(),
-                "COLLECTIONS".to_string(),
-                "INDEXES".to_string(),
+                "DATABASE".to_string(),
+                "COLLECTION".to_string(),
+                "INDEX".to_string(),
                 "STATUS".to_string(),
                 "USERS".to_string(),
             ]);

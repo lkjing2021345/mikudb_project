@@ -46,12 +46,30 @@ impl Formatter {
             return;
         }
 
-        match self.format {
-            OutputFormat::Table => self.print_table(&result.documents),
-            OutputFormat::Json => self.print_json(&result.documents, false),
-            OutputFormat::JsonPretty => self.print_json(&result.documents, true),
-            OutputFormat::Csv => self.print_csv(&result.documents),
-            OutputFormat::Line => self.print_line(&result.documents),
+        let use_line_format = if let OutputFormat::Table = self.format {
+            if result.documents.len() == 1 {
+                if let Value::Object(map) = &result.documents[0] {
+                    map.len() > 8
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+
+        if use_line_format {
+            self.print_line(&result.documents);
+        } else {
+            match self.format {
+                OutputFormat::Table => self.print_table(&result.documents),
+                OutputFormat::Json => self.print_json(&result.documents, false),
+                OutputFormat::JsonPretty => self.print_json(&result.documents, true),
+                OutputFormat::Csv => self.print_csv(&result.documents),
+                OutputFormat::Line => self.print_line(&result.documents),
+            }
         }
 
         self.print_affected(result.affected);
@@ -202,6 +220,15 @@ fn format_value(value: &Value) -> String {
         Value::Number(n) => n.to_string(),
         Value::String(s) => s.clone(),
         Value::Array(arr) => {
+            if arr.len() == 12 && arr.iter().all(|v| v.is_u64()) {
+                let bytes: Vec<u8> = arr
+                    .iter()
+                    .filter_map(|v| v.as_u64().map(|n| n as u8))
+                    .collect();
+                if bytes.len() == 12 {
+                    return format!("{}", bytes.iter().map(|b| format!("{:02x}", b)).collect::<String>());
+                }
+            }
             let items: Vec<String> = arr.iter().map(format_value).collect();
             format!("[{}]", items.join(", "))
         }

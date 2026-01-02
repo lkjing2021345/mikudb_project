@@ -308,12 +308,118 @@ impl ClientHandler {
                 cursor_id: None,
                 message: None,
             },
-            QR::Status { size, stats } => QueryResponse {
-                success: true,
-                affected: 0,
-                documents: vec![serde_json::json!({"size": size, "stats": stats})],
-                cursor_id: None,
-                message: None,
+            QR::Status { size, stats } => {
+                let mut status_info = serde_json::Map::new();
+                status_info.insert("version".to_string(), serde_json::json!("0.1.1"));
+                status_info.insert("engine".to_string(), serde_json::json!("RocksDB"));
+                status_info.insert("compression".to_string(), serde_json::json!("LZ4"));
+
+                status_info.insert("storage_size_bytes".to_string(), serde_json::json!(size));
+                status_info.insert("storage_size_mb".to_string(), serde_json::json!(format!("{:.2}", size as f64 / 1024.0 / 1024.0)));
+
+                for line in stats.lines() {
+                    let line = line.trim();
+
+                    if line.starts_with("Uptime(secs):") {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() > 1 {
+                            let uptime_val = parts[1].trim_end_matches(',');
+                            if let Ok(uptime_f) = uptime_val.parse::<f64>() {
+                                status_info.insert("uptime_seconds".to_string(), serde_json::json!(format!("{:.1}", uptime_f)));
+                            }
+                        }
+                        if parts.len() > 4 {
+                            let interval_val = parts[4].trim_end_matches(',');
+                            if let Ok(interval_f) = interval_val.parse::<f64>() {
+                                status_info.insert("interval_seconds".to_string(), serde_json::json!(format!("{:.1}", interval_f)));
+                            }
+                        }
+                    }
+
+                    else if line.starts_with("Cumulative writes:") {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() > 2 {
+                            status_info.insert("cumulative_writes".to_string(), serde_json::json!(parts[2]));
+                        }
+                        if parts.len() > 4 {
+                            status_info.insert("cumulative_keys_written".to_string(), serde_json::json!(parts[4].trim_end_matches(',')));
+                        }
+                    }
+
+                    else if line.starts_with("Interval writes:") {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() > 2 {
+                            status_info.insert("interval_writes".to_string(), serde_json::json!(parts[2]));
+                        }
+                        if parts.len() > 4 {
+                            status_info.insert("interval_keys_written".to_string(), serde_json::json!(parts[4].trim_end_matches(',')));
+                        }
+                    }
+
+                    else if line.starts_with("Cumulative stall:") {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() > 2 {
+                            status_info.insert("cumulative_stall_time".to_string(), serde_json::json!(parts[2].trim_end_matches(',')));
+                        }
+                    }
+
+                    else if line.starts_with("Interval stall:") {
+                        let parts: Vec<&str> = line.split_whitespace().collect();
+                        if parts.len() > 2 {
+                            status_info.insert("interval_stall_time".to_string(), serde_json::json!(parts[2].trim_end_matches(',')));
+                        }
+                    }
+
+                    else if line.contains("Block cache") && line.contains("usage:") {
+                        if let Some(usage_str) = line.split("usage:").nth(1) {
+                            if let Some(usage_part) = usage_str.split_whitespace().next() {
+                                status_info.insert("block_cache_usage".to_string(), serde_json::json!(usage_part));
+                            }
+                            if let Some(usage_remainder) = usage_str.split_whitespace().nth(1) {
+                                status_info.insert("block_cache_usage_unit".to_string(), serde_json::json!(usage_remainder.trim_end_matches(',')));
+                            }
+                        }
+                        if let Some(capacity_str) = line.split("capacity:").nth(1) {
+                            if let Some(capacity_part) = capacity_str.split_whitespace().next() {
+                                status_info.insert("block_cache_capacity".to_string(), serde_json::json!(capacity_part));
+                            }
+                            if let Some(capacity_remainder) = capacity_str.split_whitespace().nth(1) {
+                                status_info.insert("block_cache_capacity_unit".to_string(), serde_json::json!(capacity_remainder.trim_end_matches(',')));
+                            }
+                        }
+                    }
+
+                    else if line.contains("compaction.CPU") {
+                        if let Some(cpu_str) = line.split(':').nth(1) {
+                            status_info.insert("compaction_cpu_time".to_string(), serde_json::json!(cpu_str.trim()));
+                        }
+                    }
+
+                    else if line.contains("compaction.bytes.written") {
+                        if let Some(bytes_str) = line.split(':').nth(1) {
+                            status_info.insert("compaction_bytes_written".to_string(), serde_json::json!(bytes_str.trim()));
+                        }
+                    }
+
+                    else if line.contains("flush.CPU") {
+                        if let Some(cpu_str) = line.split(':').nth(1) {
+                            status_info.insert("flush_cpu_time".to_string(), serde_json::json!(cpu_str.trim()));
+                        }
+                    }
+
+                    else if line.starts_with("Level") && line.contains("Files") {
+                        let level_info = line.replace("  ", " ");
+                        status_info.insert("storage_levels".to_string(), serde_json::json!(level_info));
+                    }
+                }
+
+                QueryResponse {
+                    success: true,
+                    affected: 0,
+                    documents: vec![serde_json::Value::Object(status_info)],
+                    cursor_id: None,
+                    message: None,
+                }
             },
         };
 
@@ -374,15 +480,42 @@ impl ClientHandler {
     }
 
     async fn handle_update(&mut self, payload: &[u8], request_id: u32, response_to: u32) -> ServerResult<Message> {
-        let _update_req: UpdateRequest = serde_json::from_slice(payload)
+        let update_req: UpdateRequest = serde_json::from_slice(payload)
             .map_err(|e| ServerError::Protocol(format!("Invalid update request: {}", e)))?;
+
+        let collection = self.storage.get_collection(&update_req.collection)?;
+        let docs = collection.find_all()?;
+
+        let filter_value = update_req.filter;
+        let update_value = update_req.update;
+
+        let mut modified_count = 0u64;
+        let mut matched_count = 0u64;
+
+        for mut doc in docs {
+            if filter_value != serde_json::Value::Null && !match_filter(&doc, &filter_value) {
+                continue;
+            }
+            matched_count += 1;
+
+            if apply_update(&mut doc, &update_value) {
+                if let Some(id) = doc.id() {
+                    collection.update(id, &doc)?;
+                    modified_count += 1;
+                }
+            }
+
+            if !update_req.multi {
+                break;
+            }
+        }
 
         let response = QueryResponse {
             success: true,
-            affected: 0,
+            affected: modified_count,
             documents: vec![],
             cursor_id: None,
-            message: Some("Update not yet implemented".to_string()),
+            message: Some(format!("Matched {}, modified {}", matched_count, modified_count)),
         };
 
         let payload = serde_json::to_vec(&response).unwrap_or_default();
@@ -390,15 +523,36 @@ impl ClientHandler {
     }
 
     async fn handle_delete(&mut self, payload: &[u8], request_id: u32, response_to: u32) -> ServerResult<Message> {
-        let _delete_req: DeleteRequest = serde_json::from_slice(payload)
+        let delete_req: DeleteRequest = serde_json::from_slice(payload)
             .map_err(|e| ServerError::Protocol(format!("Invalid delete request: {}", e)))?;
+
+        let collection = self.storage.get_collection(&delete_req.collection)?;
+        let docs = collection.find_all()?;
+
+        let filter_value = delete_req.filter;
+        let mut deleted_count = 0u64;
+
+        for doc in docs {
+            if filter_value != serde_json::Value::Null && !match_filter(&doc, &filter_value) {
+                continue;
+            }
+
+            if let Some(id) = doc.id() {
+                collection.delete(id)?;
+                deleted_count += 1;
+            }
+
+            if !delete_req.multi {
+                break;
+            }
+        }
 
         let response = QueryResponse {
             success: true,
-            affected: 0,
+            affected: deleted_count,
             documents: vec![],
             cursor_id: None,
-            message: Some("Delete not yet implemented".to_string()),
+            message: Some(format!("Deleted {} document(s)", deleted_count)),
         };
 
         let payload = serde_json::to_vec(&response).unwrap_or_default();
@@ -467,4 +621,116 @@ fn json_to_boml(value: serde_json::Value) -> mikudb_boml::BomlValue {
             BomlValue::Document(doc)
         }
     }
+}
+
+fn match_filter(doc: &mikudb_boml::Document, filter: &serde_json::Value) -> bool {
+    use mikudb_boml::BomlValue;
+
+    let serde_json::Value::Object(filter_map) = filter else {
+        return false;
+    };
+
+    for (key, expected) in filter_map {
+        let actual = match doc.get(key) {
+            Some(v) => v,
+            None => return false,
+        };
+
+        match expected {
+            serde_json::Value::Null => {
+                if !matches!(actual, BomlValue::Null) {
+                    return false;
+                }
+            }
+            serde_json::Value::Bool(b) => {
+                if let BomlValue::Boolean(actual_b) = actual {
+                    if actual_b != b {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+            serde_json::Value::Number(n) => {
+                let matches = if let Some(i) = n.as_i64() {
+                    matches!(actual, BomlValue::Int64(v) if *v == i)
+                } else if let Some(f) = n.as_f64() {
+                    matches!(actual, BomlValue::Float64(v) if (*v - f).abs() < 1e-10)
+                } else {
+                    false
+                };
+                if !matches {
+                    return false;
+                }
+            }
+            serde_json::Value::String(s) => {
+                if let BomlValue::String(actual_s) = actual {
+                    if actual_s.as_str() != s.as_str() {
+                        return false;
+                    }
+                } else {
+                    return false;
+                }
+            }
+            _ => return false,
+        }
+    }
+
+    true
+}
+
+fn apply_update(doc: &mut mikudb_boml::Document, update: &serde_json::Value) -> bool {
+    use mikudb_boml::BomlValue;
+
+    let serde_json::Value::Object(update_map) = update else {
+        return false;
+    };
+
+    let mut modified = false;
+
+    for (key, value) in update_map {
+        if key == "$set" {
+            if let serde_json::Value::Object(set_map) = value {
+                for (field, val) in set_map {
+                    doc.insert(field, json_to_boml(val.clone()));
+                    modified = true;
+                }
+            }
+        } else if key == "$inc" {
+            if let serde_json::Value::Object(inc_map) = value {
+                for (field, val) in inc_map {
+                    if let Some(current) = doc.get(field) {
+                        if let (BomlValue::Int64(curr_i), serde_json::Value::Number(inc_n)) = (current, val) {
+                            if let Some(inc_i) = inc_n.as_i64() {
+                                doc.insert(field, BomlValue::Int64(curr_i + inc_i));
+                                modified = true;
+                            }
+                        }
+                    }
+                }
+            }
+        } else if key == "$unset" {
+            if let serde_json::Value::Object(unset_map) = value {
+                for (field, _) in unset_map {
+                    if doc.remove(field).is_some() {
+                        modified = true;
+                    }
+                }
+            }
+        } else if key == "$push" {
+            if let serde_json::Value::Object(push_map) = value {
+                for (field, val) in push_map {
+                    if let Some(BomlValue::Array(arr)) = doc.get_mut(field) {
+                        arr.push(json_to_boml(val.clone()));
+                        modified = true;
+                    }
+                }
+            }
+        } else {
+            doc.insert(key, json_to_boml(value.clone()));
+            modified = true;
+        }
+    }
+
+    modified
 }
