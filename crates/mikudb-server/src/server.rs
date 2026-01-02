@@ -189,6 +189,7 @@ impl Server {
                             stream,
                             server.storage.clone(),
                             server.session_manager.clone(),
+                            server.user_manager.clone(),
                             server.config.clone(),
                         );
 
@@ -217,6 +218,7 @@ impl Server {
                                 stream,
                                 server.storage.clone(),
                                 server.session_manager.clone(),
+                                server.user_manager.clone(),
                                 server.config.clone(),
                             );
 
@@ -318,6 +320,7 @@ async fn handle_tls_connection(
                 stream,
                 server.storage.clone(),
                 server.session_manager.clone(),
+                server.user_manager.clone(),
                 server.config.clone(),
             );
             handler.handle().await?;

@@ -69,12 +69,16 @@ pub enum Statement {
     // 用户管理
     /// 创建用户
     CreateUser(CreateUserStatement),
+    /// 修改用户
+    AlterUser(AlterUserStatement),
     /// 删除用户
     DropUser(String),
     /// 授予权限
     Grant(GrantStatement),
     /// 撤销权限
     Revoke(RevokeStatement),
+    /// 显示用户权限
+    ShowGrants(Option<String>),
 
     // AI 功能(实验性)
     /// AI 查询
@@ -588,6 +592,19 @@ pub struct CreateUserStatement {
     pub password: String,
     /// 角色列表
     pub roles: Vec<String>,
+}
+
+/// ALTER USER 语句
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct AlterUserStatement {
+    /// 用户名
+    pub username: String,
+    /// 新密码
+    pub password: Option<String>,
+    /// 要添加的角色
+    pub add_roles: Option<Vec<String>>,
+    /// 要移除的角色
+    pub remove_roles: Option<Vec<String>>,
 }
 
 /// GRANT 语句

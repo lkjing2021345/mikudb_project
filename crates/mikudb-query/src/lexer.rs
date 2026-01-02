@@ -24,6 +24,8 @@ pub enum Token {
     Show,
     #[token("CREATE", ignore(ascii_case))]
     Create,
+    #[token("ALTER", ignore(ascii_case))]
+    Alter,
     #[token("DROP", ignore(ascii_case))]
     Drop,
     #[token("DATABASE", ignore(ascii_case))]
@@ -144,6 +146,8 @@ pub enum Token {
     Users,
     #[token("USER", ignore(ascii_case))]
     User,
+    #[token("GRANTS", ignore(ascii_case))]
+    Grants,
     #[token("WITH", ignore(ascii_case))]
     With,
     #[token("PASSWORD", ignore(ascii_case))]

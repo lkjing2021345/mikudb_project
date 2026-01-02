@@ -285,9 +285,10 @@ impl UserManager {
 
         let admin_db = "admin";
         let users_collection = "users";
+        let full_collection_name = format!("{}:{}", admin_db, users_collection);
 
         let collections = self.storage.list_collections()?;
-        if !collections.contains(&users_collection.to_string()) {
+        if !collections.contains(&full_collection_name) {
             warn!("Initializing authentication system...");
             warn!("Creating admin.users collection");
 
@@ -301,7 +302,7 @@ impl UserManager {
                 }],
             )?;
 
-            let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
+            let collection = self.storage.get_or_create_collection(&full_collection_name)?;
 
             let mut user_doc = Document::new();
             user_doc.insert("_id".to_string(), mikudb_boml::BomlValue::String(root_user.id.clone().into()));
@@ -351,8 +352,205 @@ impl UserManager {
         })
     }
 
+    pub async fn create_user(
+        &self,
+        username: &str,
+        password: &str,
+        roles: Vec<RoleAssignment>,
+    ) -> ServerResult<()> {
+        use mikudb_boml::Document;
+
+        let admin_db = "admin";
+        let users_collection = "users";
+        let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
+
+        let docs = collection.find_all()?;
+        for doc in &docs {
+            if let Some(mikudb_boml::BomlValue::String(existing_username)) = doc.get("username") {
+                if existing_username.as_str() == username {
+                    return Err(ServerError::Internal(format!("User '{}' already exists", username)));
+                }
+            }
+        }
+
+        let user = self.create_user_internal(username, password, roles)?;
+
+        let mut user_doc = Document::new();
+        user_doc.insert("_id".to_string(), mikudb_boml::BomlValue::String(user.id.clone().into()));
+        user_doc.insert("username".to_string(), mikudb_boml::BomlValue::String(user.username.into()));
+
+        let mut cred_doc = Document::new();
+        cred_doc.insert("salt".to_string(), mikudb_boml::BomlValue::String(user.credentials.salt.into()));
+        cred_doc.insert("storedKey".to_string(), mikudb_boml::BomlValue::String(user.credentials.stored_key.into()));
+        cred_doc.insert("serverKey".to_string(), mikudb_boml::BomlValue::String(user.credentials.server_key.into()));
+        cred_doc.insert("iterations".to_string(), mikudb_boml::BomlValue::Int64(user.credentials.iterations as i64));
+        user_doc.insert("credentials".to_string(), cred_doc);
+
+        let roles_vec: Vec<mikudb_boml::BomlValue> = user.roles.iter().map(|r| {
+            let mut role_doc = Document::new();
+            role_doc.insert("role".to_string(), mikudb_boml::BomlValue::String(r.role.clone().into()));
+            role_doc.insert("db".to_string(), mikudb_boml::BomlValue::String(r.db.clone().into()));
+            mikudb_boml::BomlValue::from(role_doc)
+        }).collect();
+        user_doc.insert("roles".to_string(), mikudb_boml::BomlValue::Array(roles_vec));
+
+        collection.insert(&mut user_doc)?;
+        Ok(())
+    }
+
+    pub async fn alter_user_password(
+        &self,
+        username: &str,
+        new_password: &str,
+    ) -> ServerResult<()> {
+        use mikudb_boml::{Document, BomlValue};
+
+        let admin_db = "admin";
+        let users_collection = "users";
+        let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
+
+        let mut docs = collection.find_all()?;
+        let mut found = false;
+        for doc in &mut docs {
+            if let Some(BomlValue::String(existing_username)) = doc.get("username") {
+                if existing_username.as_str() == username {
+                    found = true;
+                    let new_credentials = create_scram_credentials(new_password, 10000)?;
+
+                    let mut cred_doc = Document::new();
+                    cred_doc.insert("salt".to_string(), BomlValue::String(new_credentials.salt.into()));
+                    cred_doc.insert("storedKey".to_string(), BomlValue::String(new_credentials.stored_key.into()));
+                    cred_doc.insert("serverKey".to_string(), BomlValue::String(new_credentials.server_key.into()));
+                    cred_doc.insert("iterations".to_string(), BomlValue::Int64(new_credentials.iterations as i64));
+                    doc.insert("credentials".to_string(), cred_doc);
+
+                    if let Some(obj_id) = doc.id() {
+                        collection.update(obj_id, doc)?;
+                    } else {
+                        return Err(ServerError::Internal("Document has no _id".to_string()));
+                    }
+                    break;
+                }
+            }
+        }
+
+        if !found {
+            return Err(ServerError::Internal(format!("User '{}' not found", username)));
+        }
+
+        Ok(())
+    }
+
+    pub async fn drop_user(&self, username: &str) -> ServerResult<()> {
+        use mikudb_boml::BomlValue;
+
+        if username == "root" {
+            return Err(ServerError::Internal("Cannot drop root user".to_string()));
+        }
+
+        let admin_db = "admin";
+        let users_collection = "users";
+        let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
+
+        let docs = collection.find_all()?;
+        let mut found = false;
+        for doc in &docs {
+            if let Some(BomlValue::String(existing_username)) = doc.get("username") {
+                if existing_username.as_str() == username {
+                    found = true;
+                    if let Some(obj_id) = doc.id() {
+                        collection.delete(obj_id)?;
+                    } else {
+                        return Err(ServerError::Internal("Document has no _id".to_string()));
+                    }
+                    break;
+                }
+            }
+        }
+
+        if !found {
+            return Err(ServerError::Internal(format!("User '{}' not found", username)));
+        }
+
+        Ok(())
+    }
+
+    pub async fn list_users(&self) -> ServerResult<Vec<StoredUser>> {
+        use mikudb_boml::BomlValue;
+        use tracing::info;
+
+        let admin_db = "admin";
+        let users_collection = "users";
+        let full_collection_name = format!("{}:{}", admin_db, users_collection);
+        let collection = self.storage.get_or_create_collection(&full_collection_name)?;
+
+        let docs = collection.find_all()?;
+        info!("list_users: Found {} documents in {}", docs.len(), full_collection_name);
+        let mut users = Vec::new();
+
+        for doc in docs {
+            info!("list_users: Processing document with keys: {:?}", doc.keys().collect::<Vec<_>>());
+
+            let id_str = doc.id().map(|oid| oid.to_hex()).unwrap_or_else(|| "unknown".to_string());
+
+            if let Some(BomlValue::String(username)) = doc.get("username") {
+                info!("list_users: Found user {} with id {}", username, id_str);
+                let cred_doc = doc.get("credentials")
+                    .and_then(|v| if let BomlValue::Document(d) = v { Some(d) } else { None })
+                    .ok_or_else(|| ServerError::Internal("Missing credentials".to_string()))?;
+
+                let credentials = UserCredentials {
+                    salt: cred_doc.get("salt")
+                        .and_then(|v| if let BomlValue::String(s) = v { Some(s.to_string()) } else { None })
+                        .unwrap_or_default(),
+                    stored_key: cred_doc.get("storedKey")
+                        .and_then(|v| if let BomlValue::String(s) = v { Some(s.to_string()) } else { None })
+                        .unwrap_or_default(),
+                    server_key: cred_doc.get("serverKey")
+                        .and_then(|v| if let BomlValue::String(s) = v { Some(s.to_string()) } else { None })
+                        .unwrap_or_default(),
+                    iterations: cred_doc.get("iterations")
+                        .and_then(|v| if let BomlValue::Int64(i) = v { Some(*i as u32) } else { None })
+                        .unwrap_or(10000),
+                };
+
+                let roles_vec = doc.get("roles")
+                    .and_then(|v| if let BomlValue::Array(arr) = v { Some(arr) } else { None });
+
+                let mut roles = Vec::new();
+                if let Some(roles_array) = roles_vec {
+                    for role_val in roles_array {
+                        if let BomlValue::Document(role_doc) = role_val {
+                            if let (Some(BomlValue::String(role)), Some(BomlValue::String(db))) =
+                                (role_doc.get("role"), role_doc.get("db")) {
+                                roles.push(RoleAssignment {
+                                    role: role.to_string(),
+                                    db: db.to_string(),
+                                });
+                            }
+                        }
+                    }
+                }
+
+                users.push(StoredUser {
+                    id: id_str.clone(),
+                    username: username.to_string(),
+                    credentials,
+                    roles,
+                    created_at: Utc::now(),
+                    updated_at: Utc::now(),
+                });
+            }
+        }
+
+        Ok(users)
+    }
+
     pub async fn authenticate(&self, username: &str, password: &str) -> ServerResult<User> {
         use mikudb_boml::{Document, BomlValue};
+        use tracing::{info, warn};
+
+        info!("authenticate: Attempting to authenticate user '{}'", username);
 
         let admin_db = "admin";
         let users_collection = "users";
@@ -360,6 +558,8 @@ impl UserManager {
         let collection = self.storage.get_or_create_collection(&format!("{}:{}", admin_db, users_collection))?;
 
         let docs = collection.find_all()?;
+        info!("authenticate: Found {} total users in database", docs.len());
+
         let matching_docs: Vec<_> = docs.into_iter().filter(|doc| {
             doc.get("username")
                 .and_then(|v| if let BomlValue::String(s) = v { Some(s.as_str()) } else { None })
@@ -367,7 +567,10 @@ impl UserManager {
                 .unwrap_or(false)
         }).collect();
 
+        info!("authenticate: Found {} matching users for '{}'", matching_docs.len(), username);
+
         if matching_docs.is_empty() {
+            warn!("authenticate: User '{}' not found in database", username);
             return Err(ServerError::AuthFailed("User not found".to_string()));
         }
 
@@ -396,8 +599,11 @@ impl UserManager {
         };
 
         if !verify_scram_password(password, &credentials)? {
+            warn!("authenticate: Invalid password for user '{}'", username);
             return Err(ServerError::AuthFailed("Invalid password".to_string()));
         }
+
+        info!("authenticate: Successfully authenticated user '{}'", username);
 
         let roles_vec = user_doc.get("roles")
             .and_then(|v| if let BomlValue::Array(arr) = v { Some(arr) } else { None })

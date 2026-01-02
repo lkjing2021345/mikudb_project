@@ -149,6 +149,8 @@ impl<'a> Parser<'a> {
         match self.next() {
             // 普通标识符或引号标识符
             Some(Token::Identifier(s)) | Some(Token::QuotedIdentifier(s)) => Ok(s),
+            // 字符串字面量也可以作为标识符（用于用户名等）
+            Some(Token::String(s)) => Ok(s),
             // 允许关键字作为标识符(例如集合名为 "users")
             Some(Token::Users) => Ok("users".to_string()),
             Some(Token::User) => Ok("user".to_string()),
@@ -181,6 +183,7 @@ impl<'a> Parser<'a> {
             Some(Token::Use) => self.parse_use(),
             Some(Token::Show) => self.parse_show(),
             Some(Token::Create) => self.parse_create(),
+            Some(Token::Alter) => self.parse_alter(),
             Some(Token::Drop) => self.parse_drop(),
             Some(Token::Insert) => self.parse_insert(),
             Some(Token::Find) => self.parse_find(),
@@ -252,8 +255,17 @@ impl<'a> Parser<'a> {
                 self.next();
                 Ok(Statement::ShowUsers)
             }
+            Some(Token::Grants) => {
+                self.next();
+                let username = if self.peek() == Some(&Token::From) || matches!(self.peek(), Some(Token::Identifier(_)) | Some(Token::QuotedIdentifier(_))) {
+                    Some(self.parse_identifier()?)
+                } else {
+                    None
+                };
+                Ok(Statement::ShowGrants(username))
+            }
             _ => Err(QueryError::Syntax(
-                "Expected DATABASE, COLLECTION, INDEX, STATUS, or USERS".to_string(),
+                "Expected DATABASE, COLLECTION, INDEX, STATUS, USERS, or GRANTS".to_string(),
             )),
         }
     }
@@ -770,6 +782,34 @@ impl<'a> Parser<'a> {
             privilege,
             resource,
             username,
+        }))
+    }
+
+    /// # Brief
+    /// 解析 ALTER USER 语句
+    ///
+    /// 语法: ALTER USER <username> PASSWORD <new_password>
+    fn parse_alter(&mut self) -> QueryResult<Statement> {
+        self.expect(Token::Alter)?;
+        self.expect(Token::User)?;
+        let username = self.parse_identifier()?;
+
+        let mut password = None;
+        let mut add_roles = None;
+        let mut remove_roles = None;
+
+        if self.skip_if(Token::Password) {
+            password = Some(match self.next() {
+                Some(Token::String(s)) => s,
+                _ => return Err(QueryError::Syntax("Expected password string".to_string())),
+            });
+        }
+
+        Ok(Statement::AlterUser(AlterUserStatement {
+            username,
+            password,
+            add_roles,
+            remove_roles,
         }))
     }
 

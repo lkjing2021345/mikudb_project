@@ -3,7 +3,7 @@
 //! 本模块负责处理来自客户端的所有请求,包括认证、查询、增删改查等操作。
 //! 使用 MikuWire 二进制协议进行通信,支持异步处理和会话管理。
 
-use crate::auth::Authenticator;
+use crate::auth::UserManager;
 use crate::config::ServerConfig;
 use crate::protocol::*;
 use crate::session::SessionManager;
@@ -38,6 +38,8 @@ pub struct ClientHandler {
     storage: Arc<StorageEngine>,
     /// 会话管理器(共享)
     session_manager: Arc<SessionManager>,
+    /// 用户管理器(共享)
+    user_manager: Arc<UserManager>,
     /// 服务器配置
     config: ServerConfig,
     /// 当前会话 ID(认证成功后设置)
@@ -57,6 +59,7 @@ impl ClientHandler {
     /// * `stream` - TCP 连接流
     /// * `storage` - 存储引擎实例
     /// * `session_manager` - 会话管理器
+    /// * `user_manager` - 用户管理器
     /// * `config` - 服务器配置
     ///
     /// # Returns
@@ -66,6 +69,7 @@ impl ClientHandler {
         stream: TcpStream,
         storage: Arc<StorageEngine>,
         session_manager: Arc<SessionManager>,
+        user_manager: Arc<UserManager>,
         config: ServerConfig,
     ) -> Self {
         // 如果认证未启用,则默认为已认证状态
@@ -75,6 +79,7 @@ impl ClientHandler {
             stream,
             storage,
             session_manager,
+            user_manager,
             config,
             session_id: None,
             current_database: None,
@@ -248,36 +253,34 @@ impl ClientHandler {
         let auth_req: AuthRequest = serde_json::from_slice(payload)
             .map_err(|e| ServerError::Protocol(format!("Invalid auth request: {}", e)))?;
 
-        let authenticator = Authenticator::new(&self.config.auth);
+        match self.user_manager.authenticate(&auth_req.username, &auth_req.password).await {
+            Ok(user) => {
+                let session = self.session_manager.create_session(auth_req.username.clone());
+                self.session_id = Some(session.id());
+                self.authenticated = true;
 
-        if authenticator.verify(&auth_req.username, &auth_req.password) {
-            // 认证成功:创建会话
-            let session = self.session_manager.create_session(auth_req.username.clone());
-            self.session_id = Some(session.id());
-            self.authenticated = true;
+                if let Some(db) = auth_req.database {
+                    self.current_database = Some(db);
+                }
 
-            // 如果指定了数据库,切换到该数据库
-            if let Some(db) = auth_req.database {
-                self.current_database = Some(db);
+                let response = AuthResponse {
+                    success: true,
+                    session_id: Some(session.id()),
+                    message: "Authentication successful".to_string(),
+                };
+
+                let payload = serde_json::to_vec(&response).unwrap_or_default();
+                Ok(Message::response(request_id, response_to, payload))
             }
-
-            let response = AuthResponse {
-                success: true,
-                session_id: Some(session.id()),
-                message: "Authentication successful".to_string(),
-            };
-
-            let payload = serde_json::to_vec(&response).unwrap_or_default();
-            Ok(Message::response(request_id, response_to, payload))
-        } else {
-            // 认证失败
-            let response = AuthResponse {
-                success: false,
-                session_id: None,
-                message: "Authentication failed".to_string(),
-            };
-            let payload = serde_json::to_vec(&response).unwrap_or_default();
-            Ok(Message::response(request_id, response_to, payload))
+            Err(_) => {
+                let response = AuthResponse {
+                    success: false,
+                    session_id: None,
+                    message: "Authentication failed".to_string(),
+                };
+                let payload = serde_json::to_vec(&response).unwrap_or_default();
+                Ok(Message::response(request_id, response_to, payload))
+            }
         }
     }
 
@@ -326,20 +329,104 @@ impl ClientHandler {
             }
         };
 
-        // 执行查询
-        let executor = QueryExecutor::new(self.storage.clone());
-        let result = match executor.execute(&statement) {
-            Ok(res) => res,
-            Err(e) => {
-                let error_response = QueryResponse {
-                    success: false,
-                    affected: 0,
-                    documents: vec![],
-                    cursor_id: None,
-                    message: Some(format!("Execution error: {}", e)),
-                };
-                let payload = serde_json::to_vec(&error_response).unwrap_or_default();
-                return Ok(Message::response(request_id, response_to, payload));
+        use mikudb_query::Statement;
+
+        let result = match &statement {
+            Statement::CreateUser(create_user) => {
+                use crate::auth::RoleAssignment;
+                let roles: Vec<RoleAssignment> = create_user.roles.iter().map(|r| RoleAssignment {
+                    role: r.clone(),
+                    db: "*".to_string(),
+                }).collect();
+
+                match self.user_manager.create_user(&create_user.username, &create_user.password, roles).await {
+                    Ok(_) => mikudb_query::QueryResponse::Ok {
+                        message: format!("User '{}' created successfully", create_user.username),
+                    },
+                    Err(e) => mikudb_query::QueryResponse::Ok {
+                        message: format!("Error creating user: {}", e),
+                    },
+                }
+            }
+            Statement::AlterUser(alter_user) => {
+                if let Some(ref password) = alter_user.password {
+                    match self.user_manager.alter_user_password(&alter_user.username, password).await {
+                        Ok(_) => mikudb_query::QueryResponse::Ok {
+                            message: format!("User '{}' password updated", alter_user.username),
+                        },
+                        Err(e) => mikudb_query::QueryResponse::Ok {
+                            message: format!("Error updating password: {}", e),
+                        },
+                    }
+                } else {
+                    mikudb_query::QueryResponse::Ok {
+                        message: "No changes specified".to_string(),
+                    }
+                }
+            }
+            Statement::DropUser(username) => {
+                match self.user_manager.drop_user(username).await {
+                    Ok(_) => mikudb_query::QueryResponse::Ok {
+                        message: format!("User '{}' dropped", username),
+                    },
+                    Err(e) => mikudb_query::QueryResponse::Ok {
+                        message: format!("Error dropping user: {}", e),
+                    },
+                }
+            }
+            Statement::ShowUsers => {
+                match self.user_manager.list_users().await {
+                    Ok(users) => {
+                        let user_docs: Vec<mikudb_boml::Document> = users.iter().map(|u| {
+                            let mut doc = mikudb_boml::Document::new();
+                            doc.insert("username".to_string(), mikudb_boml::BomlValue::String(u.username.clone().into()));
+                            let roles_array: Vec<mikudb_boml::BomlValue> = u.roles.iter().map(|r| {
+                                let mut role_doc = mikudb_boml::Document::new();
+                                role_doc.insert("role".to_string(), mikudb_boml::BomlValue::String(r.role.clone().into()));
+                                role_doc.insert("db".to_string(), mikudb_boml::BomlValue::String(r.db.clone().into()));
+                                mikudb_boml::BomlValue::from(role_doc)
+                            }).collect();
+                            doc.insert("roles".to_string(), mikudb_boml::BomlValue::Array(roles_array));
+                            doc
+                        }).collect();
+                        mikudb_query::QueryResponse::Documents(user_docs)
+                    },
+                    Err(e) => mikudb_query::QueryResponse::Ok {
+                        message: format!("Error listing users: {}", e),
+                    },
+                }
+            }
+            Statement::ShowGrants(_username) => {
+                mikudb_query::QueryResponse::Ok {
+                    message: "SHOW GRANTS not yet implemented".to_string(),
+                }
+            }
+            Statement::Grant(_) => {
+                mikudb_query::QueryResponse::Ok {
+                    message: "GRANT not yet implemented".to_string(),
+                }
+            }
+            Statement::Revoke(_) => {
+                mikudb_query::QueryResponse::Ok {
+                    message: "REVOKE not yet implemented".to_string(),
+                }
+            }
+            _ => {
+                let executor = QueryExecutor::new(self.storage.clone());
+                match executor.execute(&statement) {
+                    Ok(res) => res,
+                    Err(e) => {
+                        let error_response = QueryResponse {
+                            success: false,
+                            affected: 0,
+                            documents: vec![],
+                            cursor_id: None,
+                            message: Some(format!("Execution error: {}", e)),
+                        };
+                        let payload = serde_json::to_vec(&error_response).unwrap_or_default();
+                        return Ok(Message::response(request_id, response_to, payload));
+                    }
+                }
             }
         };
 
