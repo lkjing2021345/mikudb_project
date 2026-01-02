@@ -1,0 +1,226 @@
+# MikuDB 集群节点配置示例
+# 用于生产环境的 3 节点集群部署
+
+# ============================================
+# 基础配置
+# ============================================
+
+# 服务器网络配置
+bind = "0.0.0.0"
+port = 3939
+
+# 数据存储目录
+data_dir = "/var/lib/mikudb/data"
+
+# 最大并发连接数
+max_connections = 10000
+
+# 连接超时时间(毫秒)
+timeout_ms = 30000
+
+# ============================================
+# 集群配置
+# ============================================
+
+[cluster]
+# 启用集群模式
+enabled = true
+
+# 节点唯一标识 (每个节点不同)
+# node-1: "node-1"
+# node-2: "node-2"
+# node-3: "node-3"
+node_id = "node-1"
+
+# 集群通信地址 (每个节点不同)
+# node-1: "192.168.1.101:3940"
+# node-2: "192.168.1.102:3940"
+# node-3: "192.168.1.103:3940"
+bind_addr = "192.168.1.101:3940"
+
+# 集群种子节点 (所有节点相同)
+seeds = [
+    "192.168.1.101:3940",
+    "192.168.1.102:3940",
+    "192.168.1.103:3940"
+]
+
+# ============================================
+# Raft 共识算法配置
+# ============================================
+
+[cluster.raft]
+# 心跳间隔 (毫秒)
+# 低延迟网络: 50-100ms
+# 高延迟网络: 100-200ms
+heartbeat_interval_ms = 100
+
+# 选举超时最小值 (毫秒)
+# 应为 heartbeat_interval 的 3-5 倍
+election_timeout_min_ms = 300
+
+# 选举超时最大值 (毫秒)
+# 应为 election_timeout_min 的 1.5-2 倍
+election_timeout_max_ms = 500
+
+# 快照触发阈值 (日志条数)
+# 日志达到此数量时触发快照
+snapshot_threshold = 10000
+
+# ============================================
+# 数据复制配置
+# ============================================
+
+[cluster.replication]
+# 复制模式:
+# - "async": 异步复制 (性能最高,可能丢数据)
+# - "semi_sync": 半同步 (至少 1 个从节点确认)
+# - "sync": 全同步 (所有从节点确认,性能最低)
+mode = "async"
+
+# 写入确认策略:
+# - "one": 仅主节点确认
+# - "majority": 多数节点确认 (推荐)
+# - "all": 所有节点确认
+write_concern = "majority"
+
+# 最大复制延迟 (秒)
+# 超过此延迟的从节点标记为不健康
+max_lag_seconds = 10
+
+# ============================================
+# 存储引擎配置
+# ============================================
+
+[storage]
+# 页大小 (字节)
+page_size = 16384
+
+# 缓存大小
+# 推荐: 系统内存的 25%-50%
+cache_size = "4GB"
+
+# 压缩算法:
+# - "none": 不压缩
+# - "snappy": 快速压缩
+# - "lz4": 平衡压缩比和速度 (推荐)
+# - "zstd": 高压缩比
+compression = "lz4"
+
+# 是否同步写入 (fsync)
+# false: 性能高,断电可能丢数据
+# true: 安全性高,性能低
+sync_writes = false
+
+# ============================================
+# 认证配置
+# ============================================
+
+[auth]
+# 是否启用认证
+enabled = true
+
+# 首次启动时会自动创建 root 用户
+# 默认密码: mikudb_initial_password
+# 请务必修改!
+
+# ============================================
+# TLS/SSL 配置 (可选)
+# ============================================
+
+[tls]
+# 启用 TLS 加密连接
+enabled = false
+
+# 服务器证书文件路径 (PEM 格式)
+# cert_file = "/etc/mikudb/certs/server.crt"
+
+# 服务器私钥文件路径 (PEM 格式)
+# key_file = "/etc/mikudb/certs/server.key"
+
+# CA 证书文件路径 (用于客户端证书验证)
+# ca_file = "/etc/mikudb/certs/ca.crt"
+
+# 是否要求客户端证书认证
+# require_client_cert = false
+
+# TLS 协议版本
+# min_protocol_version = "TLS1.2"
+# max_protocol_version = "TLS1.3"
+
+# ============================================
+# 日志配置
+# ============================================
+
+[log]
+# 日志级别:
+# - "error": 仅错误
+# - "warn": 警告及以上
+# - "info": 信息及以上 (推荐)
+# - "debug": 调试信息
+# - "trace": 详细跟踪
+level = "info"
+
+# 日志文件路径
+file = "/var/lib/mikudb/logs/mikudb.log"
+
+# 日志轮转策略:
+# - "daily": 每天轮转
+# - "hourly": 每小时轮转
+# - "size": 按大小轮转
+rotation = "daily"
+
+# 保留日志文件数量
+max_files = 7
+
+# ============================================
+# OpenEuler 系统优化配置
+# ============================================
+
+[openeuler]
+# 启用大页内存
+# 需要系统支持: sysctl -w vm.nr_hugepages=1024
+enable_huge_pages = false
+
+# 大页大小 (MB)
+huge_pages_size_mb = 0
+
+# 启用 NUMA 绑定
+# 推荐: 多 NUMA 节点系统启用
+enable_numa = false
+
+# 绑定到指定 NUMA 节点 (0, 1, ...)
+# 查看: numactl --hardware
+numa_node = 0
+
+# 启用 io_uring (Linux 5.1+)
+# 需要内核支持
+enable_io_uring = false
+
+# CPU 亲和性 (绑定到指定 CPU 核心)
+# 例如: [0, 1, 2, 3] 绑定到前 4 个核心
+cpu_affinity = []
+
+# 启用 Direct I/O
+# 绕过页缓存,减少内存占用
+enable_direct_io = false
+
+# TCP_CORK: 批量发送数据包
+tcp_cork = true
+
+# TCP_NODELAY: 禁用 Nagle 算法,降低延迟
+tcp_nodelay = true
+
+# ============================================
+# 监控配置 (可选)
+# ============================================
+
+# [monitoring]
+# # Prometheus 监控端口
+# prometheus_port = 3941
+#
+# # 启用慢查询日志
+# slow_query_log = true
+#
+# # 慢查询阈值 (毫秒)
+# slow_query_threshold_ms = 1000

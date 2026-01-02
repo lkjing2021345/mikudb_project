@@ -1,0 +1,65 @@
+# MikuDB TLS 配置示例
+# 此配置启用 TLS/SSL 加密连接
+
+# 服务器网络配置
+bind = "0.0.0.0"
+port = 3939
+
+# 数据存储目录
+data_dir = "./data"
+
+# 最大并发连接数
+max_connections = 10000
+
+# 连接超时时间(毫秒)
+timeout_ms = 30000
+
+# 存储引擎配置
+[storage]
+page_size = 16384
+cache_size = "1GB"
+compression = "lz4"
+sync_writes = false
+
+# 认证配置
+[auth]
+enabled = true
+default_user = "miku"
+default_password = "mikumiku3939"
+
+# TLS/SSL 加密配置
+[tls]
+# 启用 TLS
+enabled = true
+
+# 服务器证书文件路径 (PEM 格式)
+cert_file = "./certs/server.crt"
+
+# 服务器私钥文件路径 (PEM 格式)
+key_file = "./certs/server.key"
+
+# CA 证书文件路径 (用于客户端证书验证,可选)
+# ca_file = "./certs/ca.crt"
+
+# 是否要求客户端证书认证 (默认: false)
+require_client_cert = false
+
+# TLS 最低协议版本
+min_protocol_version = "TLS1.2"
+
+# TLS 最高协议版本
+max_protocol_version = "TLS1.3"
+
+# 日志配置
+[log]
+level = "info"
+rotation = "daily"
+max_files = 7
+
+# OpenEuler 系统优化配置
+[openeuler]
+enable_huge_pages = false
+enable_numa = false
+enable_io_uring = false
+tcp_cork = true
+tcp_nodelay = true
