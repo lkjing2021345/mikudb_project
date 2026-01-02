@@ -33,11 +33,11 @@ impl MqlHighlighter {
                 "FIND", "INSERT", "UPDATE", "DELETE", "INTO", "FROM", "WHERE",
                 "SET", "AND", "OR", "NOT", "IN", "LIKE", "BETWEEN", "IS", "NULL",
                 "SELECT", "ORDER", "BY", "ASC", "DESC", "LIMIT", "SKIP", "OFFSET",
-                "CREATE", "DROP", "ALTER", "INDEX", "COLLECTION", "DATABASE",
+                "CREATE", "DROP", "INDEX", "COLLECTION", "DATABASE",
                 "SHOW", "USE", "DATABASES", "COLLECTIONS", "INDEXES",
                 "BEGIN", "COMMIT", "ROLLBACK", "TRANSACTION",
                 "AGGREGATE", "MATCH", "GROUP", "SORT", "PROJECT", "LOOKUP",
-                "UNWIND", "BUCKET", "AS", "ON", "UNIQUE", "TEXT", "TTL",
+                "UNWIND", "AS", "ON", "UNIQUE", "TEXT", "TTL",
                 "TRUE", "FALSE",
             ],
             // 内置函数(聚合、更新操作符、日期、字符串等)

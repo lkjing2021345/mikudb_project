@@ -654,12 +654,12 @@ DROP INDEX idx_email ON users
 ### 3. 查看索引
 
 ```sql
-SHOW INDEX ON collection_name
+SHOW INDEXES ON collection_name
 ```
 
 **示例：**
 ```sql
-SHOW INDEX ON users
+SHOW INDEXES ON users
 ```
 
 **输出示例：**
@@ -844,6 +844,54 @@ AGGREGATE users
 
 ---
 
+#### 8. LOOKUP（关联查询）
+
+```sql
+AGGREGATE collection_name
+  | LOOKUP from_collection AS output_field ON local_field = foreign_field
+```
+
+**参数说明：**
+- `from_collection`: 要关联的集合名
+- `output_field`: 输出字段名（关联结果存储在此字段）
+- `local_field`: 当前集合的关联字段
+- `foreign_field`: 目标集合的关联字段
+
+**示例：**
+```sql
+-- 假设有两个集合：
+-- orders: {"_id": 1, "product_id": "p1", "quantity": 5}
+-- products: {"_id": "p1", "name": "Laptop", "price": 999.99}
+
+-- 关联查询订单和产品信息
+AGGREGATE orders
+  | LOOKUP products AS product_info ON product_id = _id
+```
+
+**结果：**
+```json
+{
+  "_id": 1,
+  "product_id": "p1",
+  "quantity": 5,
+  "product_info": [
+    {"_id": "p1", "name": "Laptop", "price": 999.99}
+  ]
+}
+```
+
+**组合使用示例：**
+```sql
+-- 统计每个产品的总销售额
+AGGREGATE orders
+  | LOOKUP products AS product ON product_id = _id
+  | UNWIND product
+  | GROUP BY product.name AS {total_sales: SUM(quantity * product.price)}
+  | SORT total_sales DESC
+```
+
+---
+
 ### 完整聚合示例
 
 #### 示例1：统计各城市用户数量，按数量降序排序
@@ -976,13 +1024,13 @@ MikuDB 支持以下隔离级别：
 ### 1. 创建用户
 
 ```sql
-CREATE USER username WITH PASSWORD 'password' ROLE role_name
+CREATE USER username PASSWORD 'password' ROLE role_name
 ```
 
 **示例：**
 ```sql
-CREATE USER alice WITH PASSWORD 'secret123' ROLE admin
-CREATE USER bob WITH PASSWORD 'pass456' ROLE reader
+CREATE USER alice PASSWORD 'secret123' ROLE admin
+CREATE USER bob PASSWORD 'pass456' ROLE reader
 ```
 
 ---
@@ -1067,12 +1115,28 @@ exit / quit    # 退出CLI
 clear          # 清屏
 status         # 显示连接状态
 use <db>       # 切换数据库（同 USE 命令）
+lang <en|zh>   # 切换语言（英文/中文）
+```
+
+**获取命令详细帮助：**
+
+在任何命令后加 `?` 可以查看该命令的详细帮助信息：
+
+```bash
+FIND ?         # 查看 FIND 命令详细帮助
+INSERT ?       # 查看 INSERT 命令详细帮助
+AGGREGATE ?    # 查看 AGGREGATE 命令详细帮助
+lang ?         # 查看语言切换命令详细帮助
 ```
 
 **示例：**
 ```
 mikudb> help
 mikudb> status
+mikudb> lang zh          # 切换到中文
+mikudb> lang en          # 切换到英文
+mikudb> lang             # 显示当前语言
+mikudb> FIND ?           # 查看 FIND 命令详细帮助
 mikudb> clear
 mikudb> exit
 ```

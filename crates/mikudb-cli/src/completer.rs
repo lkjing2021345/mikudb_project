@@ -33,19 +33,19 @@ impl MqlCompleter {
                 // 查询子句
                 "SELECT", "ORDER", "BY", "ASC", "DESC", "LIMIT", "SKIP", "OFFSET",
                 // DDL 操作
-                "CREATE", "DROP", "ALTER", "INDEX", "COLLECTION", "DATABASE",
+                "CREATE", "DROP", "INDEX", "COLLECTION", "DATABASE",
                 // 管理命令
                 "SHOW", "USE", "STATUS", "USERS", "USER",
                 // 事务
                 "BEGIN", "COMMIT", "ROLLBACK", "TRANSACTION",
                 // 聚合操作
                 "AGGREGATE", "MATCH", "GROUP", "SORT", "PROJECT", "LOOKUP",
-                "UNWIND", "BUCKET", "AS", "ON", "UNIQUE", "TEXT", "TTL",
+                "UNWIND", "AS", "ON", "UNIQUE", "TEXT", "TTL",
                 // 字面量
                 "TRUE", "FALSE",
             ],
             commands: vec![
-                "help", "exit", "quit", "clear", "status", "use",
+                "help", "exit", "quit", "clear", "status", "use", "lang", "language",
             ],
         }
     }
@@ -191,6 +191,16 @@ impl MqlCompleter {
         // DELETE 后面提示 FROM
         if upper.ends_with("DELETE ") {
             completions.push("FROM".to_string());
+        }
+
+        // LANG 命令补全语言选项
+        if upper.ends_with("LANG ") || upper.ends_with("LANGUAGE ") {
+            completions.extend(vec![
+                "en".to_string(),
+                "zh".to_string(),
+                "english".to_string(),
+                "chinese".to_string(),
+            ]);
         }
 
         completions

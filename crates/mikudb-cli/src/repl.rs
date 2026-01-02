@@ -10,7 +10,9 @@
 use crate::client::Client;
 use crate::completer::MqlCompleter;
 use crate::formatter::Formatter;
+use crate::help;
 use crate::highlighter::MqlHighlighter;
+use crate::i18n::{current_language, set_language, t, Language};
 use crate::{CliError, CliResult, Config};
 use colored::Colorize;
 use rustyline::config::Configurer;
@@ -229,6 +231,17 @@ impl Repl {
                     // 添加到历史记录
                     let _ = self.editor.add_history_entry(line);
 
+                    // 处理 ? 后缀帮助
+                    if line.ends_with('?') {
+                        let cmd = line.trim_end_matches('?').trim();
+                        if let Some(help_text) = help::get_command_help(cmd) {
+                            println!("{}", help_text);
+                        } else {
+                            println!("{} {}", "No help available for:".yellow(), cmd);
+                        }
+                        continue;
+                    }
+
                     // 处理内置命令
                     if self.handle_builtin(line).await? {
                         continue;
@@ -276,12 +289,11 @@ impl Repl {
  | |\/| | | |/ / | | | | | |  _ \
  | |  | | |   <| |_| | |_| | |_) |
  |_|  |_|_|_|\_\\__,_|____/|____/
-
- MikuDB CLI v{}
- Type 'help' for commands, 'exit' to quit.
-"#,
-            env!("CARGO_PKG_VERSION")
+"#
         );
+        println!(" {} v{}", t!("welcome.title"), env!("CARGO_PKG_VERSION"));
+        println!(" {}", t!("welcome.help"));
+        println!();
     }
 
     /// # Brief
@@ -314,7 +326,7 @@ impl Repl {
                 std::process::exit(0);
             }
             "help" | "\\h" | "?" => {
-                self.print_help();
+                help::print_main_help();
                 Ok(true)
             }
             "clear" | "\\c" => {
@@ -334,60 +346,36 @@ impl Repl {
                 self.print_status().await;
                 Ok(true)
             }
+            "lang" | "language" => {
+                if parts.len() > 1 {
+                    if let Some(lang) = Language::from_str(parts[1]) {
+                        set_language(lang);
+                        println!("{}: {}", t!("lang.switched"), lang.as_str());
+                    } else {
+                        println!("{}", t!("lang.usage"));
+                    }
+                } else {
+                    println!("{}: {}", t!("lang.current"), current_language().as_str());
+                }
+                Ok(true)
+            }
             _ => Ok(false),
         }
     }
 
     /// # Brief
-    /// 打印帮助信息
-    fn print_help(&self) {
-        println!(
-            r#"
-{}
-  FIND <collection> [WHERE <condition>]   - Query documents
-  INSERT INTO <collection> {{...}}          - Insert document
-  UPDATE <collection> SET ... WHERE ...   - Update documents
-  DELETE FROM <collection> WHERE ...      - Delete documents
-
-{}
-  SHOW DATABASE                           - List databases
-  SHOW COLLECTION                         - List collections
-  CREATE COLLECTION <name>                - Create collection
-  DROP COLLECTION <name>                  - Drop collection
-  CREATE INDEX <name> ON <col> (fields)   - Create index
-
-{}
-  USE <database>                          - Switch database
-  help, \h, ?                             - Show this help
-  clear, \c                               - Clear screen
-  status, \s                              - Show connection status
-  exit, quit, \q                          - Exit CLI
-
-{}
-  Ctrl+C                                  - Cancel current input
-  Ctrl+D                                  - Exit CLI
-  Tab                                     - Auto-complete
-  Up/Down                                 - History navigation
-"#,
-            "Query Commands:".green().bold(),
-            "Database Commands:".green().bold(),
-            "Built-in Commands:".green().bold(),
-            "Keyboard Shortcuts:".green().bold()
-        );
-    }
-
-    /// # Brief
     /// 打印连接状态
     async fn print_status(&self) {
-        println!("{}", "Connection Status:".green().bold());
-        println!("  Host: {}:{}", self.client.host(), self.client.port());
-        println!("  User: {}", self.client.user());
+        println!("{}", t!("status.title").green().bold());
+        println!("  {}: {}:{}", t!("status.server"), self.client.host(), self.client.port());
+        println!("  {}: {}", t!("status.user"), self.client.user());
         println!(
-            "  Database: {}",
+            "  {}: {}",
+            t!("status.database"),
             self.current_database
                 .as_deref()
                 .unwrap_or("(none)")
         );
-        println!("  Connected: {}", "Yes".green());
+        println!("  {}: {}", t!("status.connected"), t!("status.connected").green());
     }
 }

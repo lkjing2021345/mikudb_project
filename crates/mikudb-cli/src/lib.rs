@@ -6,6 +6,7 @@
 //! - 语法高亮和自动补全
 //! - 多种输出格式(Table, JSON, CSV, Line)
 //! - 连接管理和认证
+//! - 多语言支持(中文/英文)
 
 pub mod cli;
 pub mod repl;
@@ -13,11 +14,20 @@ pub mod highlighter;
 pub mod completer;
 pub mod formatter;
 pub mod client;
+pub mod i18n;
+pub mod help;
 
 pub use cli::Cli;
 pub use repl::Repl;
 
 use thiserror::Error;
+
+/// 初始化 CLI 环境
+///
+/// 加载用户配置(如语言设置)
+pub fn init() {
+    i18n::load_language_config();
+}
 
 /// CLI 配置
 ///

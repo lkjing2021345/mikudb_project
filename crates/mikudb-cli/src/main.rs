@@ -66,6 +66,9 @@ struct Args {
 /// - 进入 REPL 交互模式(默认)
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
+    // 初始化 CLI 环境(加载语言配置等)
+    mikudb_cli::init();
+
     // 解析命令行参数
     let args = Args::parse();
 

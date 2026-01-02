@@ -12,6 +12,7 @@
 //! - 单个文档且字段 >8 时自动切换到 Line 格式
 //! - ANSI 颜色支持
 
+use crate::i18n::t;
 use colored::Colorize;
 use serde_json::Value;
 
@@ -80,7 +81,7 @@ impl Formatter {
             if let Some(msg) = &result.message {
                 println!("{}", msg);
             } else {
-                println!("{}", "No documents found.".dimmed());
+                println!("{}", t!("result.no_documents").dimmed());
             }
             self.print_affected(result.affected);
             return;
@@ -293,7 +294,12 @@ impl Formatter {
     /// * `affected` - 受影响的文档数量
     fn print_affected(&self, affected: u64) {
         if affected > 0 {
-            let msg = format!("{} document(s) affected", affected);
+            let doc_word = if affected == 1 {
+                t!("result.document")
+            } else {
+                t!("result.documents")
+            };
+            let msg = format!("{} {} {}", affected, doc_word, t!("result.affected"));
             if self.color {
                 println!("{}", msg.dimmed());
             } else {
