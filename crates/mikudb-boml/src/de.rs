@@ -1,3 +1,12 @@
+//! Serde 反序列化模块
+//!
+//! 实现 Serde Deserializer trait,将 BomlValue 反序列化为 Rust 数据结构。
+//!
+//! 支持所有标准 Rust 类型的反序列化:
+//! - 基本类型: bool, 整数, 浮点数, 字符串
+//! - 复合类型: 结构体, 枚举, 数组, 元组, HashMap
+//! - 自动类型转换: Int32 -> i64, Int64 -> i32 (如果在范围内)
+
 use crate::value::BomlValue;
 use crate::BomlError;
 use compact_str::CompactString;

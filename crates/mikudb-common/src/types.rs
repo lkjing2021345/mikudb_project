@@ -1,5 +1,20 @@
+//! 公共类型定义模块
+//!
+//! 定义 MikuDB 的核心类型:
+//! - ObjectId: 12 字节唯一标识符(类似 MongoDB ObjectId)
+//! - DocumentId: 文档 ID 封装
+//! - CollectionName: 集合名称(带验证)
+//! - DatabaseName: 数据库名称(带验证)
+//! - Timestamp: 毫秒级时间戳
+
 use serde::{Deserialize, Serialize};
 use std::time::{SystemTime, UNIX_EPOCH};
+
+/// ObjectId - 12 字节唯一标识符
+///
+/// 格式:
+/// - 前 4 字节: 时间戳(秒,大端)
+/// - 后 8 字节: 随机数(/dev/urandom 或系统熵)
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct ObjectId([u8; 12]);
 
@@ -83,6 +98,9 @@ fn rand_bytes<const N: usize>() -> [u8; N] {
     bytes
 }
 
+/// 文档 ID
+///
+/// 封装 ObjectId,用于标识文档。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DocumentId(pub ObjectId);
 
@@ -108,6 +126,12 @@ impl std::fmt::Display for DocumentId {
     }
 }
 
+/// 集合名称
+///
+/// 带验证的集合名称,禁止:
+/// - 空名称
+/// - system. 前缀
+/// - 包含 null 字符
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct CollectionName(String);
 
@@ -143,6 +167,11 @@ impl std::fmt::Display for CollectionName {
     }
 }
 
+/// 数据库名称
+///
+/// 带验证的数据库名称,限制:
+/// - 不能为空
+/// - 最大 64 字符
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct DatabaseName(String);
 
@@ -173,6 +202,9 @@ impl std::fmt::Display for DatabaseName {
     }
 }
 
+/// 时间戳(毫秒)
+///
+/// Unix 时间戳,精度为毫秒。
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Timestamp(i64);
 

@@ -1,3 +1,26 @@
+//! MikuDB 核心库
+//!
+//! 提供 MikuDB 的高级 API 和核心功能:
+//! - **Database**: 数据库和集合管理
+//! - **Transaction**: 事务和会话管理
+//! - **Client**: 异步客户端 API
+//! - **Cursor**: 查询结果游标
+//! - **Pipeline**: 聚合管道构建器
+//! - **Connection**: 连接字符串解析和选项
+//! - **Builder**: 流式构建器模式
+//!
+//! # 快速开始
+//!
+//! ```rust,ignore
+//! use mikudb_core::{Client, ClientOptions};
+//!
+//! let client = Client::connect("mikudb://localhost:3939").await?;
+//! let db = client.database("test");
+//! let coll = db.collection("users");
+//!
+//! coll.insert_one(doc! { "name": "Miku", "age": 16 }).await?;
+//! ```
+
 pub mod database;
 pub mod transaction;
 pub mod client;

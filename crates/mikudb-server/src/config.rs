@@ -1,40 +1,66 @@
+//! 服务器配置模块
+//!
+//! 本模块定义了 MikuDB 服务器的所有配置选项:
+//! - 服务器网络配置(绑定地址、端口、Unix Socket)
+//! - 存储引擎配置(页大小、缓存、压缩)
+//! - 认证配置(用户、密码)
+//! - TLS 加密配置
+//! - 日志配置
+//! - OpenEuler 系统优化配置(NUMA, io_uring, Direct I/O)
+//!
+//! 支持从 TOML 文件加载配置。
+
 use crate::ServerError;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::{Path, PathBuf};
 
+/// 服务器主配置
+///
+/// 包含服务器运行所需的所有配置项。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ServerConfig {
+    /// 绑定地址 (默认: 0.0.0.0)
     #[serde(default = "default_bind")]
     pub bind: String,
 
+    /// 端口号 (默认: 3939)
     #[serde(default = "default_port")]
     pub port: u16,
 
+    /// Unix Socket 路径 (Linux 上可用)
     #[serde(default)]
     pub unix_socket: Option<String>,
 
+    /// 数据存储目录 (默认: ./data)
     #[serde(default = "default_data_dir")]
     pub data_dir: PathBuf,
 
+    /// 最大并发连接数 (默认: 10000)
     #[serde(default = "default_max_connections")]
     pub max_connections: usize,
 
+    /// 连接超时时间(毫秒) (默认: 30000)
     #[serde(default = "default_timeout")]
     pub timeout_ms: u64,
 
+    /// 存储引擎配置
     #[serde(default)]
     pub storage: StorageConfig,
 
+    /// 认证配置
     #[serde(default)]
     pub auth: AuthConfig,
 
+    /// TLS 配置
     #[serde(default)]
     pub tls: TlsConfig,
 
+    /// 日志配置
     #[serde(default)]
     pub log: LogConfig,
 
+    /// OpenEuler 系统优化配置
     #[serde(default)]
     pub openeuler: OpenEulerConfig,
 }
@@ -45,6 +71,9 @@ fn default_data_dir() -> PathBuf { PathBuf::from("./data") }
 fn default_max_connections() -> usize { 10000 }
 fn default_timeout() -> u64 { 30000 }
 
+/// 存储引擎配置
+///
+/// RocksDB 存储引擎的详细配置项。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct StorageConfig {
     #[serde(default = "default_page_size")]
@@ -68,6 +97,9 @@ fn default_cache_size() -> String { "1GB".to_string() }
 fn default_compression() -> String { "lz4".to_string() }
 fn default_sync_writes() -> bool { false }
 
+/// 认证配置
+///
+/// 用户认证相关配置。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AuthConfig {
     #[serde(default = "default_auth_enabled")]
@@ -94,6 +126,9 @@ impl Default for AuthConfig {
     }
 }
 
+/// TLS/SSL 配置
+///
+/// HTTPS 加密连接配置(当前未实现)。
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct TlsConfig {
     #[serde(default)]
@@ -106,6 +141,9 @@ pub struct TlsConfig {
     pub key_file: Option<PathBuf>,
 }
 
+/// 日志配置
+///
+/// 日志级别、输出文件和轮转策略。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LogConfig {
     #[serde(default = "default_log_level")]
@@ -136,6 +174,9 @@ impl Default for LogConfig {
     }
 }
 
+/// OpenEuler 系统优化配置
+///
+/// Linux 上的性能优化选项,包括 NUMA, io_uring, Direct I/O 等。
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct OpenEulerConfig {
     #[serde(default)]
@@ -204,21 +245,44 @@ impl Default for ServerConfig {
 }
 
 impl ServerConfig {
+    /// # Brief
+    /// 从 TOML 文件加载配置
+    ///
+    /// # Arguments
+    /// * `path` - 配置文件路径
+    ///
+    /// # Returns
+    /// 解析后的配置实例
     pub fn from_file(path: &Path) -> Result<Self, ServerError> {
+        // 读取文件内容
         let content = fs::read_to_string(path)
             .map_err(|e| ServerError::Config(format!("Failed to read config: {}", e)))?;
 
+        // 使用 TOML 解析器
         toml::from_str(&content)
             .map_err(|e| ServerError::Config(format!("Failed to parse config: {}", e)))
     }
 
+    /// # Brief
+    /// 将配置序列化为 TOML 字符串
+    ///
+    /// # Returns
+    /// TOML 格式的配置字符串
     pub fn to_toml(&self) -> Result<String, ServerError> {
         toml::to_string_pretty(self)
             .map_err(|e| ServerError::Config(format!("Failed to serialize config: {}", e)))
     }
 
+    /// # Brief
+    /// 解析缓存大小字符串
+    ///
+    /// 支持 GB/MB/KB 后缀,例如 "1GB", "512MB"。
+    ///
+    /// # Returns
+    /// 缓存大小(字节数)
     pub fn parse_cache_size(&self) -> usize {
         let s = self.storage.cache_size.to_uppercase();
+        // 判断单位后缀
         let (num, mult) = if s.ends_with("GB") {
             (s.trim_end_matches("GB").trim(), 1024 * 1024 * 1024)
         } else if s.ends_with("MB") {
@@ -226,8 +290,9 @@ impl ServerConfig {
         } else if s.ends_with("KB") {
             (s.trim_end_matches("KB").trim(), 1024)
         } else {
-            (s.as_str(), 1)
+            (s.as_str(), 1)  // 无后缀默认为字节
         };
+        // 解析数字并乘以单位,失败则使用默认值 1GB
         num.parse::<usize>().unwrap_or(1024 * 1024 * 1024) * mult
     }
 }

@@ -141,7 +141,7 @@ mikudb-cli -e "SELECT * FROM users"
 ### 服务运行状态与端口监听
 
 ```bash
-systemctl status mikudb --no-pager
+systemctl status mikudb
 ```
 
 ```bash
