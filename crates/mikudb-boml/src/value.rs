@@ -69,6 +69,8 @@ pub enum BomlValue {
     Document(IndexMap<CompactString, BomlValue>),
     /// 正则表达式
     Regex(RegexValue),
+    /// JavaScript 代码
+    JavaScript(JavaScriptValue),
 }
 
 /// 正则表达式值
@@ -80,6 +82,17 @@ pub struct RegexValue {
     pub pattern: CompactString,
     /// 正则表达式选项
     pub options: CompactString,
+}
+
+/// JavaScript 代码值
+///
+/// 包含 JavaScript 代码字符串和可选的作用域（变量绑定）
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct JavaScriptValue {
+    /// JavaScript 代码
+    pub code: CompactString,
+    /// 作用域（可选的变量绑定）
+    pub scope: Option<IndexMap<CompactString, BomlValue>>,
 }
 
 impl BomlValue {
@@ -109,6 +122,7 @@ impl BomlValue {
             BomlValue::Array(_) => "array",
             BomlValue::Document(_) => "document",
             BomlValue::Regex(_) => "regex",
+            BomlValue::JavaScript(_) => "javascript",
         }
     }
 
@@ -312,6 +326,13 @@ impl fmt::Display for BomlValue {
                 write!(f, "}}")
             }
             BomlValue::Regex(r) => write!(f, "/{}/{}", r.pattern, r.options),
+            BomlValue::JavaScript(js) => {
+                if let Some(scope) = &js.scope {
+                    write!(f, "JavaScript({}, scope: {:?})", js.code, scope)
+                } else {
+                    write!(f, "JavaScript({})", js.code)
+                }
+            }
         }
     }
 }
@@ -489,6 +510,16 @@ impl From<BomlValue> for serde_json::Value {
                     let mut map = serde_json::Map::new();
                     map.insert("$regex".to_string(), serde_json::Value::String(r.pattern.to_string()));
                     map.insert("$options".to_string(), serde_json::Value::String(r.options.to_string()));
+                    map
+                })
+            }
+            BomlValue::JavaScript(js) => {
+                serde_json::Value::Object({
+                    let mut map = serde_json::Map::new();
+                    map.insert("$code".to_string(), serde_json::Value::String(js.code.to_string()));
+                    if let Some(scope) = js.scope {
+                        map.insert("$scope".to_string(), BomlValue::Document(scope).into());
+                    }
                     map
                 })
             }

@@ -65,6 +65,10 @@ pub enum TypeMarker {
     Document = 0x0F,
     /// 正则表达式
     Regex = 0x10,
+    /// JavaScript 代码
+    JavaScript = 0x1C,
+    /// JavaScript 代码（带作用域）
+    JavaScriptWithScope = 0x1D,
 
     // 常用值的特殊标记 (零拷贝优化)
     /// 布尔值 true
@@ -129,6 +133,8 @@ impl TypeMarker {
             0x0E => Some(Self::Array),
             0x0F => Some(Self::Document),
             0x10 => Some(Self::Regex),
+            0x1C => Some(Self::JavaScript),
+            0x1D => Some(Self::JavaScriptWithScope),
             0x11 => Some(Self::BooleanTrue),
             0x12 => Some(Self::BooleanFalse),
             0x13 => Some(Self::Int32Zero),

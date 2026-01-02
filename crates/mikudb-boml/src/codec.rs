@@ -4,7 +4,7 @@
 //! 使用 xxHash3 进行校验和计算，在 ARM64 (鲲鹏) 上有优秀性能。
 
 use crate::spec::*;
-use crate::value::{BomlValue, RegexValue};
+use crate::value::{BomlValue, JavaScriptValue, RegexValue};
 use crate::{BomlError, BomlResult};
 use bytes::{Buf, BufMut, BytesMut};
 use chrono::{TimeZone, Utc};
@@ -205,6 +205,16 @@ impl<'a> Encoder<'a> {
                 self.buf.put_u8(TypeMarker::Regex as u8);
                 self.encode_string(&r.pattern);
                 self.encode_string(&r.options);
+            }
+            BomlValue::JavaScript(js) => {
+                if let Some(scope) = &js.scope {
+                    self.buf.put_u8(TypeMarker::JavaScriptWithScope as u8);
+                    self.encode_string(&js.code);
+                    self.encode_document(scope)?;
+                } else {
+                    self.buf.put_u8(TypeMarker::JavaScript as u8);
+                    self.encode_string(&js.code);
+                }
             }
         }
         Ok(())
@@ -419,6 +429,22 @@ impl<'a> Decoder<'a> {
                 let options_len = self.read_varint()? as usize;
                 let options = self.read_compact_string(options_len)?;
                 Ok(BomlValue::Regex(RegexValue { pattern, options }))
+            }
+            Some(TypeMarker::JavaScript) => {
+                let code_len = self.read_varint()? as usize;
+                let code = self.read_compact_string(code_len)?;
+                Ok(BomlValue::JavaScript(JavaScriptValue { code, scope: None }))
+            }
+            Some(TypeMarker::JavaScriptWithScope) => {
+                let code_len = self.read_varint()? as usize;
+                let code = self.read_compact_string(code_len)?;
+                let scope_len = self.read_varint()? as usize;
+                let scope_val = self.decode_document_items(scope_len)?;
+                if let BomlValue::Document(scope) = scope_val {
+                    Ok(BomlValue::JavaScript(JavaScriptValue { code, scope: Some(scope) }))
+                } else {
+                    Err(BomlError::InvalidDocument("Expected document for JavaScript scope".to_string()))
+                }
             }
             _ => Err(BomlError::InvalidTypeMarker(marker)),
         }

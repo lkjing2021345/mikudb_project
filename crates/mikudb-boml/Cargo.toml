@@ -19,6 +19,8 @@ xxhash-rust = { workspace = true }
 indexmap = { version = "2.1", features = ["serde"] }
 smallvec = { version = "1.11", features = ["serde"] }
 compact_str = { version = "0.7", features = ["serde"] }
+base64 = "0.21"
+bson = "2.9"
 
 [dev-dependencies]
 criterion = { workspace = true }

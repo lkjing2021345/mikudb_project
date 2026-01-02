@@ -36,10 +36,14 @@ pub mod codec;
 pub mod ser;
 pub mod de;
 pub mod spec;
+pub mod json;
+pub mod bson;
 
 pub use codec::{decode, encode, encode_to_vec};
 pub use document::Document;
-pub use value::BomlValue;
+pub use value::{BomlValue, JavaScriptValue, RegexValue};
+pub use json::{from_json, from_json_string, to_json, to_json_string};
+pub use bson::{from_bson, from_bson_bytes, to_bson, to_bson_bytes};
 
 use thiserror::Error;
 
