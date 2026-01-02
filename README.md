@@ -206,7 +206,6 @@ mikudb/
 | Windows (MSVC) | ✅ 通过 | 需设置 BINDGEN_EXTRA_CLANG_ARGS |
 | Linux (Ubuntu) | ✅ 通过 | - |
 | Linux (OpenEuler) | ✅ 通过 | 支持 --features openeuler |
-| macOS | 🔄 未测试 | - |
 
 ---
 
