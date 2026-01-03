@@ -139,6 +139,16 @@ impl QueryExecutor {
                 })
             }
 
+            Statement::CreateUser(_)
+            | Statement::AlterUser(_)
+            | Statement::DropUser(_)
+            | Statement::ShowUsers
+            | Statement::Grant(_)
+            | Statement::Revoke(_)
+            | Statement::ShowGrants(_) => Err(QueryError::Execution(
+                "User management statements are only supported in server mode".to_string(),
+            )),
+
             _ => Err(QueryError::Internal("Not implemented".to_string())),
         }
     }

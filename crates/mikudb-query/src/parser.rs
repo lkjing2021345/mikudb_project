@@ -166,6 +166,17 @@ impl<'a> Parser<'a> {
         }
     }
 
+    fn parse_string_literal(&mut self, label: &str) -> QueryResult<String> {
+        match self.next() {
+            Some(Token::String(s)) => Ok(s),
+            Some(t) => Err(QueryError::Syntax(format!(
+                "Expected {} string, got {:?}",
+                label, t
+            ))),
+            None => Err(QueryError::Syntax(format!("Expected {} string", label))),
+        }
+    }
+
     /// # Brief
     /// 解析顶层语句
     ///
@@ -257,8 +268,10 @@ impl<'a> Parser<'a> {
             }
             Some(Token::Grants) => {
                 self.next();
-                let username = if self.peek() == Some(&Token::From) || matches!(self.peek(), Some(Token::Identifier(_)) | Some(Token::QuotedIdentifier(_))) {
-                    Some(self.parse_identifier()?)
+                let username = if self.skip_if(Token::From) {
+                    Some(self.parse_string_literal("username")?)
+                } else if matches!(self.peek(), Some(Token::String(_))) {
+                    Some(self.parse_string_literal("username")?)
                 } else {
                     None
                 };
@@ -361,13 +374,10 @@ impl<'a> Parser<'a> {
     /// 语法: CREATE USER <username> WITH PASSWORD <password> [ROLE role1, role2, ...]
     fn parse_create_user(&mut self) -> QueryResult<Statement> {
         self.expect(Token::User)?;
-        let username = self.parse_identifier()?;
+        let username = self.parse_string_literal("username")?;
         self.expect(Token::With)?;
         self.expect(Token::Password)?;
-        let password = match self.next() {
-            Some(Token::String(s)) => s,
-            _ => return Err(QueryError::Syntax("Expected password string".to_string())),
-        };
+        let password = self.parse_string_literal("password")?;
 
         let mut roles = Vec::new();
         if self.skip_if(Token::Role) {
@@ -414,7 +424,7 @@ impl<'a> Parser<'a> {
             }
             Some(Token::User) => {
                 self.next();
-                let name = self.parse_identifier()?;
+                let name = self.parse_string_literal("username")?;
                 Ok(Statement::DropUser(name))
             }
             _ => Err(QueryError::Syntax(
@@ -757,7 +767,7 @@ impl<'a> Parser<'a> {
         self.expect(Token::On)?;
         let resource = self.parse_identifier()?;
         self.expect(Token::To)?;
-        let username = self.parse_identifier()?;
+        let username = self.parse_string_literal("username")?;
 
         Ok(Statement::Grant(GrantStatement {
             privilege,
@@ -776,7 +786,7 @@ impl<'a> Parser<'a> {
         self.expect(Token::On)?;
         let resource = self.parse_identifier()?;
         self.expect(Token::From)?;
-        let username = self.parse_identifier()?;
+        let username = self.parse_string_literal("username")?;
 
         Ok(Statement::Revoke(RevokeStatement {
             privilege,
@@ -792,17 +802,14 @@ impl<'a> Parser<'a> {
     fn parse_alter(&mut self) -> QueryResult<Statement> {
         self.expect(Token::Alter)?;
         self.expect(Token::User)?;
-        let username = self.parse_identifier()?;
+        let username = self.parse_string_literal("username")?;
 
         let mut password = None;
         let mut add_roles = None;
         let mut remove_roles = None;
 
         if self.skip_if(Token::Password) {
-            password = Some(match self.next() {
-                Some(Token::String(s)) => s,
-                _ => return Err(QueryError::Syntax("Expected password string".to_string())),
-            });
+            password = Some(self.parse_string_literal("password")?);
         }
 
         Ok(Statement::AlterUser(AlterUserStatement {
@@ -1394,5 +1401,17 @@ mod tests {
     fn test_parse_create_index() {
         let stmt = Parser::parse("CREATE UNIQUE INDEX idx_email ON users (email ASC)").unwrap();
         assert!(matches!(stmt, Statement::CreateIndex(_)));
+    }
+
+    #[test]
+    fn test_parse_create_user_string() {
+        let stmt = Parser::parse(r#"CREATE USER "alice" WITH PASSWORD "secret""#).unwrap();
+        match stmt {
+            Statement::CreateUser(create_user) => {
+                assert_eq!(create_user.username, "alice");
+                assert_eq!(create_user.password, "secret");
+            }
+            _ => panic!("Expected CreateUser statement"),
+        }
     }
 }
