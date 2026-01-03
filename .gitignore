@@ -1,9 +1,0 @@
-# Rust
-target/
-
-# JetBrains IDE
-.idea/
-*.iml
-
-# OS
-.DS_Store
