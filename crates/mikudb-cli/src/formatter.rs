@@ -15,6 +15,25 @@
 use crate::i18n::t;
 use colored::Colorize;
 use serde_json::Value;
+use unicode_width::UnicodeWidthStr;
+use once_cell::sync::Lazy;
+use regex::Regex;
+static ANSI_RE: Lazy<Regex> = Lazy::new(|| Regex::new(r"\x1b\[[0-9;]*m").unwrap());
+fn strip_ansi(s: &str) -> String {
+    ANSI_RE.replace_all(s, "").to_string()
+}
+
+fn visible_width(s: &str) -> usize {
+    UnicodeWidthStr::width(strip_ansi(s).as_str())
+}
+
+fn pad_cell(s: &str, width: usize) -> String {
+    // MySQL 风格一般不允许单元格出现换行/制表符影响布局
+    let s = s.replace('\t', "    ").replace('\n', " ");
+    let w = visible_width(&s);
+    let pad = width.saturating_sub(w);
+    format!(" {}{} ", s, " ".repeat(pad))
+}
 
 /// 格式化器
 ///
@@ -382,47 +401,53 @@ fn csv_escape(s: &str) -> String {
 /// * `headers` - 表头
 /// * `rows` - 数据行
 fn print_simple_table(headers: &[String], rows: &[Vec<String>]) {
-    // 计算每列最大宽度(strip ANSI 颜色代码)
-    let mut widths: Vec<usize> = headers.iter().map(|h| strip_ansi(h).len()).collect();
+    let col_count = headers.len();
+
+    // 1) 统一用可见宽度计算列宽
+    let mut widths: Vec<usize> = headers.iter().map(|h| visible_width(h)).collect();
 
     for row in rows {
-        for (i, cell) in row.iter().enumerate() {
-            if i < widths.len() {
-                widths[i] = widths[i].max(cell.len());
-            }
+        for i in 0..col_count {
+            let cell = row.get(i).map(String::as_str).unwrap_or("");
+            widths[i] = widths[i].max(visible_width(cell));
         }
     }
 
-    // 构造分隔线
-    let separator: String = widths.iter().map(|w| "-".repeat(*w + 2)).collect::<Vec<_>>().join("+");
+    // 2) 画边框线（跟 MySQL 一样，严格按 widths 来）
+    let separator = widths
+        .iter()
+        .map(|w| "-".repeat(*w + 2))
+        .collect::<Vec<_>>()
+        .join("+");
 
-    // 构造表头行
-    let header_row: String = headers
+    println!("+{}+", separator);
+
+    // 3) 表头
+    let header_row = headers
         .iter()
         .enumerate()
-        .map(|(i, h)| format!(" {:width$} ", h, width = widths.get(i).copied().unwrap_or(0)))
+        .map(|(i, h)| pad_cell(h, widths[i]))
         .collect::<Vec<_>>()
         .join("|");
-
-    // 打印表头
-    println!("+{}+", separator);
     println!("|{}|", header_row);
+
     println!("+{}+", separator);
 
-    // 打印数据行
+    // 4) 数据行
     for row in rows {
-        let row_str: String = row
-            .iter()
-            .enumerate()
-            .map(|(i, cell)| format!(" {:width$} ", cell, width = widths.get(i).copied().unwrap_or(0)))
+        let row_str = (0..col_count)
+            .map(|i| {
+                let cell = row.get(i).map(String::as_str).unwrap_or("");
+                pad_cell(cell, widths[i])
+            })
             .collect::<Vec<_>>()
             .join("|");
         println!("|{}|", row_str);
     }
 
-    // 打印底部分隔线
     println!("+{}+", separator);
 }
+
 
 /// # Brief
 /// 移除 ANSI 颜色代码
@@ -434,10 +459,14 @@ fn print_simple_table(headers: &[String], rows: &[Vec<String>]) {
 ///
 /// # Returns
 /// 无颜色代码的字符串
+
+
+/**
 fn strip_ansi(s: &str) -> String {
     let re = regex::Regex::new(r"\x1b\[[0-9;]*m").unwrap();
     re.replace_all(s, "").to_string()
 }
+**/
 
 /// 查询结果
 ///

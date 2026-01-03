@@ -15,6 +15,8 @@ use std::path::Path;
 /// CLI 非交互模式执行器
 ///
 /// 用于执行单条查询或批量脚本文件,不进入 REPL 环境。
+
+
 pub struct Cli {
     /// 数据库客户端连接
     client: Client,
